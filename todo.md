@@ -94,3 +94,4 @@
 - [x] Apply the ribbon geometry consistently to canvas rendering and SVG/PNG/PDF export.
 - [x] Add regression coverage for ribbon geometry, tapering, and pressure easing.
 - [x] Visually verify natural stroke appearance and save the brush-rendering checkpoint.
+- [x] Repair angular ribbon edges: offset edge points are now smoothed with quadratic curves (matching the shared-join formula), so fast strokes render as true curves on canvas and in SVG/PNG/PDF export.
