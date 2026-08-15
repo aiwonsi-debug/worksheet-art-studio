@@ -4,6 +4,8 @@ import { nanoid } from "nanoid";
 import type { PathLayer, ShapeLayer, StudioLayer, StudioTool, TextLayer, WorksheetCanvasState } from "@/lib/studioTypes";
 import { WORKSHEET_HEIGHT, WORKSHEET_WIDTH } from "@/lib/studioTypes";
 import { createStrokePoint, pressureAdjustedStroke, resolveStylusInput } from "@/lib/penInput";
+import { fillSelectedShape, sampleLayerColor } from "@/lib/advancedDrawingTools";
+import { shapePoints } from "@/lib/drawingElements";
 
 type PointerSession = { kind: "draw"; id: string; pointerId: number; baseSize: number; sensitivity: number; isPen: boolean } | { kind: "move"; id: string; pointerId: number; originX: number; originY: number; layerX: number; layerY: number; isPen: boolean } | null;
 
@@ -18,6 +20,7 @@ type Props = {
   pressureSensitivity: number;
   onPenDetected?: () => void;
   onEditStart?: () => void;
+  onPickColor?: (color: string) => void;
 };
 
 function VariableStroke({ layer }: { layer: PathLayer }) {
@@ -32,6 +35,8 @@ function ShapeElement({ layer }: { layer: ShapeLayer }) {
   const common = { stroke: layer.stroke, strokeWidth: layer.strokeWidth, opacity: layer.opacity, fill: layer.fill, fillOpacity: layer.fillOpacity };
   if (layer.shape === "rectangle") return <rect x={layer.x} y={layer.y} width={layer.width} height={layer.height} rx={12} {...common} />;
   if (layer.shape === "ellipse") return <ellipse cx={layer.x + layer.width / 2} cy={layer.y + layer.height / 2} rx={Math.abs(layer.width / 2)} ry={Math.abs(layer.height / 2)} {...common} />;
+  const points = shapePoints(layer.shape, layer.x, layer.y, layer.width, layer.height);
+  if (points) return <polygon points={points} {...common} />;
   return <line x1={layer.x} y1={layer.y} x2={layer.x + layer.width} y2={layer.y + layer.height} stroke={layer.stroke} strokeWidth={layer.strokeWidth} strokeLinecap="round" opacity={layer.opacity} markerEnd={layer.shape === "arrow" ? "url(#paperloom-arrow)" : undefined} />;
 }
 
@@ -39,7 +44,7 @@ function TextElement({ layer }: { layer: TextLayer }) {
   return <><text x={layer.x} y={layer.y + layer.fontSize} fill={layer.color} fontSize={layer.fontSize} fontWeight={layer.fontWeight} opacity={layer.opacity} fontFamily="DM Sans, sans-serif">{layer.text}</text><rect x={layer.x} y={layer.y} width={layer.width} height={layer.height} fill="transparent" /></>;
 }
 
-export default function WorksheetCanvas({ state, onChange, selectedId, onSelect, tool, brushColor, brushSize, pressureSensitivity, onPenDetected, onEditStart }: Props) {
+export default function WorksheetCanvas({ state, onChange, selectedId, onSelect, tool, brushColor, brushSize, pressureSensitivity, onPenDetected, onEditStart, onPickColor }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
   const pointerRef = useRef<PointerSession>(null);
   const activePenPointerId = useRef<number | null>(null);
@@ -64,6 +69,19 @@ export default function WorksheetCanvas({ state, onChange, selectedId, onSelect,
     const layerId = target.closest("[data-layer-id]")?.getAttribute("data-layer-id");
     const current = point(event);
     const activeTool = stylus.isEraser ? "eraser" : tool;
+    if (activeTool === "bucket" || activeTool === "eyedropper") {
+      const layer = layerId ? state.layers.find((item) => item.id === layerId) : undefined;
+      if (!layer) { onSelect(null); return; }
+      if (activeTool === "bucket" && layer.type === "shape") {
+        const next = fillSelectedShape(state, layer.id, brushColor);
+        if (next !== state) { onEditStart?.(); onChange(next); onSelect(layer.id); }
+      }
+      if (activeTool === "eyedropper") {
+        const color = sampleLayerColor(layer);
+        if (color) { onPickColor?.(color); onSelect(layer.id); }
+      }
+      return;
+    }
     if (activeTool === "select" && layerId) {
       const layer = state.layers.find((item) => item.id === layerId);
       if (!layer) return;

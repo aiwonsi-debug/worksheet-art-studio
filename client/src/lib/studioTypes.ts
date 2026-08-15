@@ -1,5 +1,5 @@
 export type AssetKind = "clipart" | "border" | "header" | "drawing" | "upload";
-export type StudioTool = "select" | "brush" | "eraser" | "rectangle" | "ellipse" | "line" | "arrow" | "text";
+export type StudioTool = "select" | "brush" | "eraser" | "rectangle" | "ellipse" | "triangle" | "diamond" | "star" | "line" | "arrow" | "text" | "bucket" | "eyedropper";
 
 export type ImageLayer = {
   id: string;
@@ -37,7 +37,7 @@ export type StrokePoint = {
   size: number;
 };
 
-export type ShapeKind = "rectangle" | "ellipse" | "line" | "arrow";
+export type ShapeKind = "rectangle" | "ellipse" | "triangle" | "diamond" | "star" | "line" | "arrow";
 
 export type ShapeLayer = {
   id: string;

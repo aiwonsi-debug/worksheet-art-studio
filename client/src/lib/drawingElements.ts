@@ -4,6 +4,9 @@ import type { ShapeKind, ShapeLayer, StudioLayer, TextLayer } from "./studioType
 const shapeNames: Record<ShapeKind, string> = {
   rectangle: "Rectangle",
   ellipse: "Ellipse",
+  triangle: "Triangle",
+  diamond: "Diamond",
+  star: "Star",
   line: "Line",
   arrow: "Arrow",
 };
@@ -26,6 +29,21 @@ export function createShapeLayer(shape: ShapeKind, id = nanoid()): ShapeLayer {
     stroke: "#42634f",
     strokeWidth: lineLike ? 7 : 5,
   };
+}
+
+export function shapePoints(shape: ShapeKind, x: number, y: number, width: number, height: number) {
+  const centerX = x + width / 2;
+  const centerY = y + height / 2;
+  if (shape === "triangle") return `${centerX},${y} ${x + width},${y + height} ${x},${y + height}`;
+  if (shape === "diamond") return `${centerX},${y} ${x + width},${centerY} ${centerX},${y + height} ${x},${centerY}`;
+  if (shape !== "star") return null;
+  const outerRadius = Math.min(Math.abs(width), Math.abs(height)) / 2;
+  const innerRadius = outerRadius * 0.45;
+  return Array.from({ length: 10 }, (_, index) => {
+    const angle = -Math.PI / 2 + index * Math.PI / 5;
+    const radius = index % 2 === 0 ? outerRadius : innerRadius;
+    return `${centerX + Math.cos(angle) * radius},${centerY + Math.sin(angle) * radius}`;
+  }).join(" ");
 }
 
 export function createTextLayer(id = nanoid()): TextLayer {

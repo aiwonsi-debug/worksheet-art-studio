@@ -47,9 +47,18 @@
 }
 
 @media (max-width: 500px) {
-  .shape-tools .tool-button:nth-child(1),
-  .shape-tools .tool-button:nth-child(3) {
+  .shape-tools {
+    max-width: 262px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .shape-tools::-webkit-scrollbar {
     display: none;
+  }
+
+  .shape-tools .tool-button {
+    flex: 0 0 auto;
   }
 
   .arrange-row--three button {

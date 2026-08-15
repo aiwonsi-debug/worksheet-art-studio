@@ -1,6 +1,7 @@
 import { jsPDF } from "jspdf";
 import type { StudioLayer, WorksheetCanvasState } from "./studioTypes";
 import { WORKSHEET_HEIGHT, WORKSHEET_WIDTH } from "./studioTypes";
+import { shapePoints } from "./drawingElements";
 
 const escape = (value: string) => value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
@@ -15,6 +16,8 @@ function renderLayer(layer: StudioLayer, imageSources: Map<string, string>) {
     const stroke = `stroke="${layer.stroke}" stroke-width="${layer.strokeWidth}" opacity="${layer.opacity}"`;
     if (layer.shape === "rectangle") return `<rect x="${layer.x}" y="${layer.y}" width="${layer.width}" height="${layer.height}" rx="12" ${fill} ${stroke} transform="${transform}"/>`;
     if (layer.shape === "ellipse") return `<ellipse cx="${layer.x + layer.width / 2}" cy="${layer.y + layer.height / 2}" rx="${Math.abs(layer.width / 2)}" ry="${Math.abs(layer.height / 2)}" ${fill} ${stroke} transform="${transform}"/>`;
+    const points = shapePoints(layer.shape, layer.x, layer.y, layer.width, layer.height);
+    if (points) return `<polygon points="${points}" ${fill} ${stroke} transform="${transform}"/>`;
     const marker = layer.shape === "arrow" ? ` marker-end="url(#paperloom-arrow)"` : "";
     return `<line x1="${layer.x}" y1="${layer.y}" x2="${layer.x + layer.width}" y2="${layer.y + layer.height}" ${stroke} stroke-linecap="round" transform="${transform}"${marker}/>`;
   }

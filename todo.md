@@ -61,3 +61,12 @@
 - [x] Verify the pushed GitHub repository and share its link.
 - [x] Review the publishable source, stage the intended changes, and commit the current verified project state.
 - [x] Recheck the clean repository state before pushing to GitHub.
+- [x] Add a GitHub Actions workflow that installs dependencies, type-checks, and runs the test suite on pushes and pull requests.
+- [x] Add advanced shape primitives beyond the existing rectangle, ellipse, line, and arrow tools.
+- [x] Add a bucket-fill tool for selected closed shapes while preserving transparent canvas behavior.
+- [x] Add an eyedropper tool that samples colors from selectable canvas elements and applies the sampled color to the active brush.
+- [x] Add regression coverage for advanced shape creation, fill, and color sampling behavior.
+- [x] Visually verify the tools and validate the workflow locally.
+- [x] Push the verified advanced-tool update to GitHub and save a delivery checkpoint.
+- [ ] Commit the advanced-tool changes, push the updated branch to GitHub, and verify the remote workflow and source files.
+- [ ] Save the advanced-tool update as a new delivery checkpoint after the GitHub push succeeds.
