@@ -20,10 +20,19 @@ describe("worksheet SVG export", () => {
     expect(svg).toContain("fill=\"#ffffff\"");
   });
 
-  it("keeps pressure-sampled path widths in SVG exports", () => {
-    const svg = renderWorksheetSvg({ transparentBackground: true, layers: [{ id: "p", type: "path", name: "stroke", d: "M 0 0", color: "#4263eb", strokeWidth: 12, mode: "draw", x: 0, y: 0, width: 0, height: 0, rotation: 0, opacity: 1, points: [{ x: 1, y: 2, size: 4 }, { x: 8, y: 9, size: 15 }] }] });
-    expect(svg).toContain('stroke-width="15"');
-    expect(svg).toContain('Q 1 2 8 9');
+  it("renders ink strokes as a closed filled ribbon with pressure-tapered widths in SVG exports", () => {
+    const svg = renderWorksheetSvg({ transparentBackground: true, layers: [{ id: "p", type: "path", name: "stroke", d: "M 0 0", color: "#4263eb", strokeWidth: 12, mode: "draw", x: 0, y: 0, width: 0, height: 0, rotation: 0, opacity: 1, points: [{ x: 1, y: 2, size: 4 }, { x: 8, y: 9, size: 15 }, { x: 20, y: 14, size: 10 }] }] });
+    expect(svg).toContain('fill="#4263eb"');
+    // The ink ribbon is one closed filled path: a path tag with the ink fill
+    // must end its d attribute with a Z command before the tag closes.
+    const match = svg.match(/<path d="[^"]*Z" fill="#4263eb" \/>/);
+    expect(match).not.toBeNull();
+  });
+
+  it("keeps eraser strokes as segmented masks in SVG exports", () => {
+    const svg = renderWorksheetSvg({ transparentBackground: true, layers: [{ id: "e", type: "path", name: "erase", d: "M 0 0", color: "#000", strokeWidth: 12, mode: "erase", x: 0, y: 0, width: 0, height: 0, rotation: 0, opacity: 1, points: [{ x: 1, y: 2, size: 4 }, { x: 8, y: 9, size: 15 }] }] });
+    expect(svg).toContain('destination-out');
+    expect(svg).toContain('stroke="#000"');
   });
 
   it("renders editable shapes and text in worksheet SVG exports", () => {

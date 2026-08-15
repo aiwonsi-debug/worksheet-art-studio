@@ -7,6 +7,7 @@ import { createStrokePoint, pressureAdjustedStroke, resolveStylusInput } from "@
 import { fillSelectedShape, sampleLayerColor } from "@/lib/advancedDrawingTools";
 import { shapePoints } from "@/lib/drawingElements";
 import { smoothStrokeSegments, stabilizeStrokePoint } from "@/lib/smoothStroke";
+import { ribbonStrokePath } from "@/lib/ribbonStroke";
 import { nextViewportFromTouchGesture, shouldNavigateTouch, type CanvasViewport, type ViewportTouchPoint } from "@/lib/canvasViewport";
 
 type PointerSession = { kind: "draw"; id: string; pointerId: number; baseSize: number; sensitivity: number; stabilizer: number; isPen: boolean } | { kind: "move"; id: string; pointerId: number; originX: number; originY: number; layerX: number; layerY: number; isPen: boolean } | null;
@@ -30,10 +31,15 @@ type Props = {
 
 function VariableStroke({ layer }: { layer: PathLayer }) {
   const points = layer.points;
-  const style = { mixBlendMode: layer.mode === "erase" ? ("destination-out" as any) : "normal" };
-  if (!points?.length) return <path d={layer.d} fill="none" stroke={layer.mode === "erase" ? "#000" : layer.color} strokeWidth={layer.strokeWidth} strokeLinecap="round" strokeLinejoin="round" opacity={layer.opacity} style={style} />;
-  if (points.length === 1) return <circle cx={points[0].x} cy={points[0].y} r={points[0].size / 2} fill={layer.mode === "erase" ? "#000" : layer.color} opacity={layer.opacity} style={style} />;
-  return <g opacity={layer.opacity} style={style}>{smoothStrokeSegments(points, layer.smoothing ?? 1).map((segment, index) => <path key={`${layer.id}-segment-${index}`} d={segment.d} fill="none" stroke={layer.mode === "erase" ? "#000" : layer.color} strokeWidth={segment.size} strokeLinecap="round" strokeLinejoin="round" />)}</g>;
+  const isEraser = layer.mode === "erase";
+  const style = { mixBlendMode: isEraser ? ("destination-out" as any) : "normal" };
+  if (!points?.length) return <path d={layer.d} fill="none" stroke={isEraser ? "#000" : layer.color} strokeWidth={layer.strokeWidth} strokeLinecap="round" strokeLinejoin="round" opacity={layer.opacity} style={style} />;
+  if (points.length === 1) return <circle cx={points[0].x} cy={points[0].y} r={points[0].size / 2} fill={isEraser ? "#000" : layer.color} opacity={layer.opacity} style={style} />;
+  // Ink strokes render as one filled ribbon with tapered ends, easing width
+  // gradually between pressure samples like a real brush. Eraser marks keep
+  // the legacy segments since the destination-out mask blends additively.
+  if (!isEraser) return <g opacity={layer.opacity} style={style}><path d={ribbonStrokePath(points, layer.smoothing ?? 1)} fill={layer.color} /></g>;
+  return <g opacity={layer.opacity} style={style}>{smoothStrokeSegments(points, layer.smoothing ?? 1).map((segment, index) => <path key={`${layer.id}-segment-${index}`} d={segment.d} fill="none" stroke="#000" strokeWidth={segment.size} strokeLinecap="round" strokeLinejoin="round" />)}</g>;
 }
 
 function ShapeElement({ layer }: { layer: ShapeLayer }) {
