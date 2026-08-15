@@ -70,3 +70,5 @@
 - [x] Push the verified advanced-tool update to GitHub and save a delivery checkpoint.
 - [ ] Commit the advanced-tool changes, push the updated branch to GitHub, and verify the remote workflow and source files.
 - [ ] Save the advanced-tool update as a new delivery checkpoint after the GitHub push succeeds.
+- [ ] Remove the duplicate pnpm-version declaration from the GitHub Actions setup so remote quality checks can run successfully.
+- [ ] Push the CI repair and verify a successful GitHub Actions quality run.
