@@ -105,4 +105,4 @@
 - [x] Add a clear, high-contrast worksheet border and depth treatment so the drawing area remains visible when zoomed out.
 - [x] Verify the desktop worksheet-boundary treatment and its regression safety.
 - [x] Verify worksheet-boundary visibility at a tablet viewport.
-- [ ] Save the verified worksheet-boundary update as a delivery checkpoint.
+- [x] Save the verified worksheet-boundary update as a delivery checkpoint.
