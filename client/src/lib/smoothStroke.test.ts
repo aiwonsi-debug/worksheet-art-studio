@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { smoothStrokeSegments } from "./smoothStroke";
+import { smoothStrokeSegments, stabilizeStrokePoint } from "./smoothStroke";
 
 describe("smoothStrokeSegments", () => {
   it("joins a freehand series through midpoint-fitted quadratic curves", () => {
@@ -21,5 +21,15 @@ describe("smoothStrokeSegments", () => {
     expect(smoothStrokeSegments([{ x: 1, y: 2, size: 4 }, { x: 8, y: 9, size: 15 }])).toEqual([
       { d: "M 1 2 Q 1 2 8 9", size: 15 },
     ]);
+  });
+
+  it("allows zero smoothing for direct point-to-point strokes", () => {
+    expect(smoothStrokeSegments([{ x: 1, y: 2, size: 4 }, { x: 8, y: 9, size: 15 }], 0)).toEqual([
+      { d: "M 1 2 L 8 9", size: 15 },
+    ]);
+  });
+
+  it("damps incoming point positions without changing their pressure width", () => {
+    expect(stabilizeStrokePoint({ x: 0, y: 0, size: 4 }, { x: 10, y: 20, size: 15 }, 0.5)).toEqual({ x: 6.4, y: 12.8, size: 15 });
   });
 });

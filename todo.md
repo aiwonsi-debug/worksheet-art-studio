@@ -75,3 +75,8 @@
 - [x] Save the verified advanced drawing and GitHub Actions update as a new delivery checkpoint.
 - [x] Smooth freehand pen and mouse curves while retaining pressure-sensitive stroke widths in canvas rendering and exports.
 - [x] Add regression coverage, visually inspect controlled rounded-curve SVG output, and confirm the live editor canvas loads after the rendering update.
+- [x] Add a user-adjustable smoothing-strength slider for freehand strokes.
+- [x] Add a stroke stabilizer control that reduces small pointer jitter during freehand drawing.
+- [x] Add a brush-preset toolbar section for pencil, marker, and highlighter styles.
+- [x] Add a safe clear-canvas action that resets worksheet elements with confirmation and undo support.
+- [x] Add regression tests and visually verify the expanded drawing controls.

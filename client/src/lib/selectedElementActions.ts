@@ -11,6 +11,10 @@ export function removeCanvasLayer(canvas: WorksheetCanvasState, id: string): Wor
   return { ...canvas, layers: canvas.layers.filter((layer) => layer.id !== id) };
 }
 
+export function clearCanvasLayers(canvas: WorksheetCanvasState): WorksheetCanvasState {
+  return { ...canvas, layers: [] };
+}
+
 export function duplicateCanvasLayer(canvas: WorksheetCanvasState, id: string, duplicateId: string): { canvas: WorksheetCanvasState; selectedId: string } | null {
   const layer = canvas.layers.find((candidate) => candidate.id === id);
   if (!layer) return null;

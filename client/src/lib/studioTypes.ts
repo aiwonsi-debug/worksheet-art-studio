@@ -29,6 +29,8 @@ export type PathLayer = {
   rotation: number;
   opacity: number;
   points?: StrokePoint[];
+  /** Curve-fit amount captured when this freehand stroke was created. */
+  smoothing?: number;
 };
 
 export type StrokePoint = {

@@ -6,9 +6,9 @@ import { WORKSHEET_HEIGHT, WORKSHEET_WIDTH } from "@/lib/studioTypes";
 import { createStrokePoint, pressureAdjustedStroke, resolveStylusInput } from "@/lib/penInput";
 import { fillSelectedShape, sampleLayerColor } from "@/lib/advancedDrawingTools";
 import { shapePoints } from "@/lib/drawingElements";
-import { smoothStrokeSegments } from "@/lib/smoothStroke";
+import { smoothStrokeSegments, stabilizeStrokePoint } from "@/lib/smoothStroke";
 
-type PointerSession = { kind: "draw"; id: string; pointerId: number; baseSize: number; sensitivity: number; isPen: boolean } | { kind: "move"; id: string; pointerId: number; originX: number; originY: number; layerX: number; layerY: number; isPen: boolean } | null;
+type PointerSession = { kind: "draw"; id: string; pointerId: number; baseSize: number; sensitivity: number; stabilizer: number; isPen: boolean } | { kind: "move"; id: string; pointerId: number; originX: number; originY: number; layerX: number; layerY: number; isPen: boolean } | null;
 
 type Props = {
   state: WorksheetCanvasState;
@@ -18,7 +18,10 @@ type Props = {
   tool: StudioTool;
   brushColor: string;
   brushSize: number;
+  brushOpacity: number;
   pressureSensitivity: number;
+  smoothingStrength: number;
+  stabilizerStrength: number;
   onPenDetected?: () => void;
   onEditStart?: () => void;
   onPickColor?: (color: string) => void;
@@ -29,7 +32,7 @@ function VariableStroke({ layer }: { layer: PathLayer }) {
   const style = { mixBlendMode: layer.mode === "erase" ? ("destination-out" as any) : "normal" };
   if (!points?.length) return <path d={layer.d} fill="none" stroke={layer.mode === "erase" ? "#000" : layer.color} strokeWidth={layer.strokeWidth} strokeLinecap="round" strokeLinejoin="round" opacity={layer.opacity} style={style} />;
   if (points.length === 1) return <circle cx={points[0].x} cy={points[0].y} r={points[0].size / 2} fill={layer.mode === "erase" ? "#000" : layer.color} opacity={layer.opacity} style={style} />;
-  return <g opacity={layer.opacity} style={style}>{smoothStrokeSegments(points).map((segment, index) => <path key={`${layer.id}-segment-${index}`} d={segment.d} fill="none" stroke={layer.mode === "erase" ? "#000" : layer.color} strokeWidth={segment.size} strokeLinecap="round" strokeLinejoin="round" />)}</g>;
+  return <g opacity={layer.opacity} style={style}>{smoothStrokeSegments(points, layer.smoothing ?? 1).map((segment, index) => <path key={`${layer.id}-segment-${index}`} d={segment.d} fill="none" stroke={layer.mode === "erase" ? "#000" : layer.color} strokeWidth={segment.size} strokeLinecap="round" strokeLinejoin="round" />)}</g>;
 }
 
 function ShapeElement({ layer }: { layer: ShapeLayer }) {
@@ -45,7 +48,7 @@ function TextElement({ layer }: { layer: TextLayer }) {
   return <><text x={layer.x} y={layer.y + layer.fontSize} fill={layer.color} fontSize={layer.fontSize} fontWeight={layer.fontWeight} opacity={layer.opacity} fontFamily="DM Sans, sans-serif">{layer.text}</text><rect x={layer.x} y={layer.y} width={layer.width} height={layer.height} fill="transparent" /></>;
 }
 
-export default function WorksheetCanvas({ state, onChange, selectedId, onSelect, tool, brushColor, brushSize, pressureSensitivity, onPenDetected, onEditStart, onPickColor }: Props) {
+export default function WorksheetCanvas({ state, onChange, selectedId, onSelect, tool, brushColor, brushSize, brushOpacity, pressureSensitivity, smoothingStrength, stabilizerStrength, onPenDetected, onEditStart, onPickColor }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
   const pointerRef = useRef<PointerSession>(null);
   const activePenPointerId = useRef<number | null>(null);
@@ -98,11 +101,11 @@ export default function WorksheetCanvas({ state, onChange, selectedId, onSelect,
     }
     const id = nanoid();
     const strokeWidth = pressureAdjustedStroke(brushSize, stylus.pressure, stylus.isPen, pressureSensitivity);
-    const layer: StudioLayer = { id, type: "path", name: activeTool === "eraser" ? "Transparent erase" : stylus.isPen ? "Pressure brush stroke" : "Freehand stroke", d: `M ${current.x} ${current.y}`, color: brushColor, strokeWidth, mode: activeTool === "eraser" ? "erase" : "draw", x: 0, y: 0, width: 0, height: 0, rotation: 0, opacity: 1, points: [createStrokePoint(current.x, current.y, brushSize, stylus.pressure, stylus.isPen, pressureSensitivity)] };
+    const layer: StudioLayer = { id, type: "path", name: activeTool === "eraser" ? "Transparent erase" : stylus.isPen ? "Pressure brush stroke" : "Freehand stroke", d: `M ${current.x} ${current.y}`, color: brushColor, strokeWidth, mode: activeTool === "eraser" ? "erase" : "draw", x: 0, y: 0, width: 0, height: 0, rotation: 0, opacity: activeTool === "eraser" ? 1 : brushOpacity, smoothing: smoothingStrength, points: [createStrokePoint(current.x, current.y, brushSize, stylus.pressure, stylus.isPen, pressureSensitivity)] };
     onEditStart?.();
     onChange({ ...state, layers: [...state.layers, layer] });
     onSelect(id);
-    pointerRef.current = { kind: "draw", id, pointerId: event.pointerId, baseSize: brushSize, sensitivity: pressureSensitivity, isPen: stylus.isPen };
+    pointerRef.current = { kind: "draw", id, pointerId: event.pointerId, baseSize: brushSize, sensitivity: pressureSensitivity, stabilizer: stabilizerStrength, isPen: stylus.isPen };
     setIsDrawing(true);
     event.currentTarget.setPointerCapture(event.pointerId);
   };
@@ -114,7 +117,13 @@ export default function WorksheetCanvas({ state, onChange, selectedId, onSelect,
     if (stylus.shouldIgnore || (session.isPen && !stylus.isPen)) return;
     const current = point(event);
     if (session.kind === "draw") {
-      updateLayer(session.id, (layer) => layer.type === "path" ? { ...layer, d: `${layer.d} L ${current.x} ${current.y}`, strokeWidth: pressureAdjustedStroke(session.baseSize, stylus.pressure, session.isPen, session.sensitivity), points: [...(layer.points ?? []), createStrokePoint(current.x, current.y, session.baseSize, stylus.pressure, session.isPen, session.sensitivity)] } : layer);
+      updateLayer(session.id, (layer) => {
+        if (layer.type !== "path") return layer;
+        const rawPoint = createStrokePoint(current.x, current.y, session.baseSize, stylus.pressure, session.isPen, session.sensitivity);
+        const priorPoint = layer.points?.at(-1);
+        const nextPoint = priorPoint ? stabilizeStrokePoint(priorPoint, rawPoint, session.stabilizer) : rawPoint;
+        return { ...layer, d: `${layer.d} L ${nextPoint.x} ${nextPoint.y}`, strokeWidth: nextPoint.size, points: [...(layer.points ?? []), nextPoint] };
+      });
       return;
     }
     updateLayer(session.id, (layer) => ({ ...layer, x: Math.max(-layer.width / 2, Math.min(WORKSHEET_WIDTH - layer.width / 2, session.layerX + current.x - session.originX)), y: Math.max(-layer.height / 2, Math.min(WORKSHEET_HEIGHT - layer.height / 2, session.layerY + current.y - session.originY)) }));

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { patchCanvasLayer, removeCanvasLayer, duplicateCanvasLayer, reorderCanvasLayer } from "./selectedElementActions";
+import { clearCanvasLayers, patchCanvasLayer, removeCanvasLayer, duplicateCanvasLayer, reorderCanvasLayer } from "./selectedElementActions";
 import type { WorksheetCanvasState } from "./studioTypes";
 
 const canvas: WorksheetCanvasState = {
@@ -27,5 +27,10 @@ describe("selected element actions", () => {
     expect(reordered.layers.map((layer) => layer.id)).toEqual(["text-1", "shape-1"]);
     expect(removeCanvasLayer(reordered, "text-1").layers.map((layer) => layer.id)).toEqual(["shape-1"]);
     expect(canvas.layers.map((layer) => layer.id)).toEqual(["shape-1", "text-1"]);
+  });
+
+  it("clears only canvas elements so background settings can be retained and restored through history", () => {
+    expect(clearCanvasLayers({ ...canvas, transparentBackground: true })).toEqual({ transparentBackground: true, layers: [] });
+    expect(canvas.layers).toHaveLength(2);
   });
 });

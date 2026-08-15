@@ -24,7 +24,7 @@ function renderLayer(layer: StudioLayer, imageSources: Map<string, string>) {
   }
   const style = `mix-blend-mode:${layer.mode === "erase" ? "destination-out" : "normal"}`;
   if (layer.points?.length === 1) { const point = layer.points[0]; return `<circle cx="${point.x}" cy="${point.y}" r="${point.size / 2}" fill="${layer.mode === "erase" ? "#000" : layer.color}" opacity="${layer.opacity}" style="${style}" />`; }
-  if (layer.points && layer.points.length > 1) return `<g opacity="${layer.opacity}" style="${style}">${smoothStrokeSegments(layer.points).map((segment) => `<path d="${segment.d}" fill="none" stroke="${layer.mode === "erase" ? "#000" : layer.color}" stroke-width="${segment.size}" stroke-linecap="round" stroke-linejoin="round" />`).join("")}</g>`;
+  if (layer.points && layer.points.length > 1) return `<g opacity="${layer.opacity}" style="${style}">${smoothStrokeSegments(layer.points, layer.smoothing ?? 1).map((segment) => `<path d="${segment.d}" fill="none" stroke="${layer.mode === "erase" ? "#000" : layer.color}" stroke-width="${segment.size}" stroke-linecap="round" stroke-linejoin="round" />`).join("")}</g>`;
   return `<path d="${escape(layer.d)}" fill="none" stroke="${layer.mode === "erase" ? "#000" : layer.color}" stroke-width="${layer.strokeWidth}" stroke-linecap="round" stroke-linejoin="round" opacity="${layer.opacity}" style="${style}" />`;
 }
 
