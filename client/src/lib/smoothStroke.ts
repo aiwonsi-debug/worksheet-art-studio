@@ -19,6 +19,9 @@ const interpolate = (first: StrokePosition, second: StrokePosition, amount: numb
   y: first.y + (second.y - first.y) * amount,
 });
 
+const smoothingJoin = (first: StrokePosition, second: StrokePosition, amount: number) =>
+  interpolate(first, midpoint(first, second), amount);
+
 /**
  * Moves an incoming point toward the prior sample. Higher values apply more
  * damping, reducing tiny hand or device movements while retaining the raw
@@ -34,10 +37,10 @@ export function stabilizeStrokePoint(previous: StrokePoint, incoming: StrokePoin
 }
 
 /**
- * Fits joined quadratic curves through raw pointer samples. Adjacent segments
- * meet at shared midpoints, which removes the sharp corner created by drawing
- * each sample pair as a standalone straight line. Point sizes stay attached to
- * the sampled pressure so the pen remains variable-width.
+ * Fits joined quadratic curves through raw pointer samples. Every interior
+ * join is calculated once from its two neighboring samples and used as both
+ * the prior segment's endpoint and next segment's start point. This prevents
+ * gaps at any smoothing strength while preserving pressure-based widths.
  */
 export function smoothStrokeSegments(points: StrokePoint[], smoothing = 1): SmoothStrokeSegment[] {
   if (points.length < 2) return [];
@@ -55,8 +58,8 @@ export function smoothStrokeSegments(points: StrokePoint[], smoothing = 1): Smoo
     const pointIndex = index + 1;
     const previous = points[pointIndex - 1];
     const next = points[pointIndex + 1];
-    const start = pointIndex === 1 ? previous : interpolate(point, midpoint(previous, point), amount);
-    const end = next ? interpolate(point, midpoint(point, next), amount) : point;
+    const start = pointIndex === 1 ? previous : smoothingJoin(previous, point, amount);
+    const end = next ? smoothingJoin(point, next, amount) : point;
     return {
       d: `M ${start.x} ${start.y} Q ${point.x} ${point.y} ${end.x} ${end.y}`,
       size: point.size,

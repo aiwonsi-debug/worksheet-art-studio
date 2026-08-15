@@ -80,3 +80,6 @@
 - [x] Add a brush-preset toolbar section for pencil, marker, and highlighter styles.
 - [x] Add a safe clear-canvas action that resets worksheet elements with confirmation and undo support.
 - [x] Add regression tests and visually verify the expanded drawing controls.
+- [x] Repair discontinuities between adjacent smoothed freehand stroke segments at every smoothing strength.
+- [x] Add regression coverage that proves consecutive curve segments share exact join coordinates.
+- [x] Validate continuous canvas and export stroke rendering, then save the repair checkpoint.

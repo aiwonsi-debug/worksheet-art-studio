@@ -29,6 +29,19 @@ describe("smoothStrokeSegments", () => {
     ]);
   });
 
+  it("reuses exact join coordinates between consecutive segments at partial smoothing", () => {
+    expect(smoothStrokeSegments([
+      { x: 0, y: 0, size: 4 },
+      { x: 20, y: 0, size: 8 },
+      { x: 20, y: 20, size: 12 },
+      { x: 40, y: 20, size: 10 },
+    ], 0.35)).toEqual([
+      { d: "M 0 0 Q 20 0 20 3.5", size: 8 },
+      { d: "M 20 3.5 Q 20 20 23.5 20", size: 12 },
+      { d: "M 23.5 20 Q 40 20 40 20", size: 10 },
+    ]);
+  });
+
   it("damps incoming point positions without changing their pressure width", () => {
     expect(stabilizeStrokePoint({ x: 0, y: 0, size: 4 }, { x: 10, y: 20, size: 15 }, 0.5)).toEqual({ x: 6.4, y: 12.8, size: 15 });
   });
