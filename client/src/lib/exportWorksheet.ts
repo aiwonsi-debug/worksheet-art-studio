@@ -9,6 +9,15 @@ function renderLayer(layer: StudioLayer, imageSources: Map<string, string>) {
   if (layer.type === "image") {
     return `<image href="${escape(imageSources.get(layer.src) ?? layer.src)}" x="${layer.x}" y="${layer.y}" width="${layer.width}" height="${layer.height}" opacity="${layer.opacity}" preserveAspectRatio="none" transform="${transform}" />`;
   }
+  if (layer.type === "text") return `<text x="${layer.x}" y="${layer.y + layer.fontSize}" fill="${layer.color}" font-size="${layer.fontSize}" font-weight="${layer.fontWeight}" font-family="DM Sans, sans-serif" opacity="${layer.opacity}" transform="${transform}">${escape(layer.text)}</text>`;
+  if (layer.type === "shape") {
+    const fill = `fill="${layer.fill}" fill-opacity="${layer.fillOpacity}"`;
+    const stroke = `stroke="${layer.stroke}" stroke-width="${layer.strokeWidth}" opacity="${layer.opacity}"`;
+    if (layer.shape === "rectangle") return `<rect x="${layer.x}" y="${layer.y}" width="${layer.width}" height="${layer.height}" rx="12" ${fill} ${stroke} transform="${transform}"/>`;
+    if (layer.shape === "ellipse") return `<ellipse cx="${layer.x + layer.width / 2}" cy="${layer.y + layer.height / 2}" rx="${Math.abs(layer.width / 2)}" ry="${Math.abs(layer.height / 2)}" ${fill} ${stroke} transform="${transform}"/>`;
+    const marker = layer.shape === "arrow" ? ` marker-end="url(#paperloom-arrow)"` : "";
+    return `<line x1="${layer.x}" y1="${layer.y}" x2="${layer.x + layer.width}" y2="${layer.y + layer.height}" ${stroke} stroke-linecap="round" transform="${transform}"${marker}/>`;
+  }
   const style = `mix-blend-mode:${layer.mode === "erase" ? "destination-out" : "normal"}`;
   if (layer.points?.length === 1) { const point = layer.points[0]; return `<circle cx="${point.x}" cy="${point.y}" r="${point.size / 2}" fill="${layer.mode === "erase" ? "#000" : layer.color}" opacity="${layer.opacity}" style="${style}" />`; }
   if (layer.points && layer.points.length > 1) return `<g opacity="${layer.opacity}" style="${style}">${layer.points.slice(1).map((point, index) => { const previous = layer.points![index]; return `<path d="M ${previous.x} ${previous.y} L ${point.x} ${point.y}" fill="none" stroke="${layer.mode === "erase" ? "#000" : layer.color}" stroke-width="${point.size}" stroke-linecap="round" stroke-linejoin="round" />`; }).join("")}</g>`;
@@ -17,7 +26,7 @@ function renderLayer(layer: StudioLayer, imageSources: Map<string, string>) {
 
 export function renderWorksheetSvg(state: WorksheetCanvasState, imageSources = new Map<string, string>()) {
   const background = state.transparentBackground ? "" : `<rect width="${WORKSHEET_WIDTH}" height="${WORKSHEET_HEIGHT}" fill="#ffffff"/>`;
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${WORKSHEET_WIDTH}" height="${WORKSHEET_HEIGHT}" viewBox="0 0 ${WORKSHEET_WIDTH} ${WORKSHEET_HEIGHT}"><g style="isolation:isolate">${background}${state.layers.map((layer) => renderLayer(layer, imageSources)).join("")}</g></svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${WORKSHEET_WIDTH}" height="${WORKSHEET_HEIGHT}" viewBox="0 0 ${WORKSHEET_WIDTH} ${WORKSHEET_HEIGHT}"><defs><marker id="paperloom-arrow" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto" markerUnits="strokeWidth"><path d="M 0 0 L 8 4 L 0 8 z" fill="#42634f"/></marker></defs><g style="isolation:isolate">${background}${state.layers.map((layer) => renderLayer(layer, imageSources)).join("")}</g></svg>`;
 }
 
 async function sourceToDataUrl(src: string) {

@@ -1,5 +1,5 @@
 export type AssetKind = "clipart" | "border" | "header" | "drawing" | "upload";
-export type StudioTool = "select" | "brush" | "eraser";
+export type StudioTool = "select" | "brush" | "eraser" | "rectangle" | "ellipse" | "line" | "arrow" | "text";
 
 export type ImageLayer = {
   id: string;
@@ -37,7 +37,42 @@ export type StrokePoint = {
   size: number;
 };
 
-export type StudioLayer = ImageLayer | PathLayer;
+export type ShapeKind = "rectangle" | "ellipse" | "line" | "arrow";
+
+export type ShapeLayer = {
+  id: string;
+  type: "shape";
+  name: string;
+  shape: ShapeKind;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+  opacity: number;
+  fill: string;
+  fillOpacity: number;
+  stroke: string;
+  strokeWidth: number;
+};
+
+export type TextLayer = {
+  id: string;
+  type: "text";
+  name: string;
+  text: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+  opacity: number;
+  color: string;
+  fontSize: number;
+  fontWeight: "normal" | "bold";
+};
+
+export type StudioLayer = ImageLayer | PathLayer | ShapeLayer | TextLayer;
 
 export type WorksheetCanvasState = {
   transparentBackground: boolean;

@@ -46,3 +46,13 @@
 - [x] Add regression coverage for long custom clipart prompts and asset-generation input validation.
 - [x] Validate the asset-generation fix and save a delivery checkpoint.
 - [x] Save the validated long-prompt asset-generation repair checkpoint.
+- [x] Add rectangle, ellipse, line, and arrow tools as editable canvas elements.
+- [x] Add a text tool with editable worksheet labels and headings.
+- [x] Add fill, stroke, and opacity controls for selected drawing elements.
+- [x] Add duplication, keyboard deletion, and layer-order actions for selected elements.
+- [x] Add regression coverage for shape, text, and selected-element editing contracts.
+- [x] Visually verify the expanded stylus-friendly drawing workspace and save a delivery checkpoint.
+- [x] Save the expanded drawing-workspace delivery checkpoint.
+- [x] Verify and test selected-element fill, stroke, and opacity editing controls.
+- [x] Verify and test duplicate, keyboard deletion, and layer-order actions for selected elements.
+- [x] Add focused regression coverage for selected-element property edits and canvas actions.

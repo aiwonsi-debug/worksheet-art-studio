@@ -1,0 +1,58 @@
+.shape-tools {
+  gap: 2px;
+}
+
+.ellipse-icon {
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+  padding: 1px;
+}
+
+.style-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.style-row .number-field {
+  flex: 1;
+}
+
+.format-toggle {
+  width: 32px;
+  height: 32px;
+  border: 1px solid #e1e5dc;
+  border-radius: 7px;
+  background: #fff;
+  color: #65746a;
+  font-family: Georgia, serif;
+  font-weight: 700;
+}
+
+.format-toggle.is-active {
+  background: #e8f0dc;
+  border-color: #cfdfbc;
+  color: #2f5a46;
+}
+
+.arrange-row--three {
+  grid-template-columns: .8fr 1.25fr .9fr;
+}
+
+.arrange-row--three button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+@media (max-width: 500px) {
+  .shape-tools .tool-button:nth-child(1),
+  .shape-tools .tool-button:nth-child(3) {
+    display: none;
+  }
+
+  .arrange-row--three button {
+    font-size: 9px;
+  }
+}

@@ -1,7 +1,7 @@
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { useRef, useState } from "react";
 import { nanoid } from "nanoid";
-import type { PathLayer, StudioLayer, StudioTool, WorksheetCanvasState } from "@/lib/studioTypes";
+import type { PathLayer, ShapeLayer, StudioLayer, StudioTool, TextLayer, WorksheetCanvasState } from "@/lib/studioTypes";
 import { WORKSHEET_HEIGHT, WORKSHEET_WIDTH } from "@/lib/studioTypes";
 import { createStrokePoint, pressureAdjustedStroke, resolveStylusInput } from "@/lib/penInput";
 
@@ -26,6 +26,17 @@ function VariableStroke({ layer }: { layer: PathLayer }) {
   if (!points?.length) return <path d={layer.d} fill="none" stroke={layer.mode === "erase" ? "#000" : layer.color} strokeWidth={layer.strokeWidth} strokeLinecap="round" strokeLinejoin="round" opacity={layer.opacity} style={style} />;
   if (points.length === 1) return <circle cx={points[0].x} cy={points[0].y} r={points[0].size / 2} fill={layer.mode === "erase" ? "#000" : layer.color} opacity={layer.opacity} style={style} />;
   return <g opacity={layer.opacity} style={style}>{points.slice(1).map((point, index) => { const previous = points[index]; return <path key={`${point.x}-${point.y}-${index}`} d={`M ${previous.x} ${previous.y} L ${point.x} ${point.y}`} fill="none" stroke={layer.mode === "erase" ? "#000" : layer.color} strokeWidth={point.size} strokeLinecap="round" strokeLinejoin="round" />; })}</g>;
+}
+
+function ShapeElement({ layer }: { layer: ShapeLayer }) {
+  const common = { stroke: layer.stroke, strokeWidth: layer.strokeWidth, opacity: layer.opacity, fill: layer.fill, fillOpacity: layer.fillOpacity };
+  if (layer.shape === "rectangle") return <rect x={layer.x} y={layer.y} width={layer.width} height={layer.height} rx={12} {...common} />;
+  if (layer.shape === "ellipse") return <ellipse cx={layer.x + layer.width / 2} cy={layer.y + layer.height / 2} rx={Math.abs(layer.width / 2)} ry={Math.abs(layer.height / 2)} {...common} />;
+  return <line x1={layer.x} y1={layer.y} x2={layer.x + layer.width} y2={layer.y + layer.height} stroke={layer.stroke} strokeWidth={layer.strokeWidth} strokeLinecap="round" opacity={layer.opacity} markerEnd={layer.shape === "arrow" ? "url(#paperloom-arrow)" : undefined} />;
+}
+
+function TextElement({ layer }: { layer: TextLayer }) {
+  return <><text x={layer.x} y={layer.y + layer.fontSize} fill={layer.color} fontSize={layer.fontSize} fontWeight={layer.fontWeight} opacity={layer.opacity} fontFamily="DM Sans, sans-serif">{layer.text}</text><rect x={layer.x} y={layer.y} width={layer.width} height={layer.height} fill="transparent" /></>;
 }
 
 export default function WorksheetCanvas({ state, onChange, selectedId, onSelect, tool, brushColor, brushSize, pressureSensitivity, onPenDetected, onEditStart }: Props) {
@@ -56,6 +67,7 @@ export default function WorksheetCanvas({ state, onChange, selectedId, onSelect,
     if (activeTool === "select" && layerId) {
       const layer = state.layers.find((item) => item.id === layerId);
       if (!layer) return;
+      onEditStart?.();
       onSelect(layerId);
       pointerRef.current = { kind: "move", id: layerId, pointerId: event.pointerId, originX: current.x, originY: current.y, layerX: layer.x, layerY: layer.y, isPen: stylus.isPen };
       event.currentTarget.setPointerCapture(event.pointerId);
@@ -101,15 +113,16 @@ export default function WorksheetCanvas({ state, onChange, selectedId, onSelect,
       <svg ref={svgRef} viewBox={`0 0 ${WORKSHEET_WIDTH} ${WORKSHEET_HEIGHT}`} className={`worksheet-paper ${state.transparentBackground ? "is-transparent" : ""}`} style={{ touchAction: "none" }} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={stopPointer} onPointerCancel={stopPointer} onLostPointerCapture={stopPointer} aria-label="Editable worksheet canvas">
         <defs>
           <pattern id="checker" width="28" height="28" patternUnits="userSpaceOnUse"><rect width="28" height="28" fill="#fff"/><rect width="14" height="14" fill="#f5f4f1"/><rect x="14" y="14" width="14" height="14" fill="#f5f4f1"/></pattern>
+          <marker id="paperloom-arrow" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto" markerUnits="strokeWidth"><path d="M 0 0 L 8 4 L 0 8 z" fill="#42634f"/></marker>
         </defs>
         <rect width={WORKSHEET_WIDTH} height={WORKSHEET_HEIGHT} fill={state.transparentBackground ? "url(#checker)" : "#fff"} />
         <g style={{ isolation: "isolate" }}>
           {state.layers.map((layer) => {
             const active = layer.id === selectedId;
             const transform = `rotate(${layer.rotation} ${layer.x + layer.width / 2} ${layer.y + layer.height / 2})`;
-            return <g key={layer.id} data-layer-id={layer.id} transform={layer.type === "image" ? transform : undefined} className={`canvas-layer ${active ? "is-selected" : ""}`}>
-              {layer.type === "image" ? <image href={layer.src} x={layer.x} y={layer.y} width={layer.width} height={layer.height} opacity={layer.opacity} preserveAspectRatio="none" /> : <VariableStroke layer={layer} />}
-              {active && layer.type === "image" ? <rect className="selection-box" x={layer.x} y={layer.y} width={layer.width} height={layer.height} fill="none" transform={transform} /> : null}
+            return <g key={layer.id} data-layer-id={layer.id} transform={layer.type === "path" ? undefined : transform} className={`canvas-layer ${active ? "is-selected" : ""}`}>
+              {layer.type === "image" ? <image href={layer.src} x={layer.x} y={layer.y} width={layer.width} height={layer.height} opacity={layer.opacity} preserveAspectRatio="none" /> : layer.type === "path" ? <VariableStroke layer={layer} /> : layer.type === "shape" ? <ShapeElement layer={layer} /> : <TextElement layer={layer} />}
+              {active && layer.type !== "path" ? <rect className="selection-box" x={layer.x} y={layer.y} width={layer.width} height={layer.height || Math.max(layer.type === "shape" ? layer.strokeWidth : 0, 18)} fill="none" /> : null}
             </g>;
           })}
         </g>

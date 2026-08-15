@@ -17,9 +17,12 @@ import { resolveStudioShortcut } from "@/lib/studioShortcuts";
 import { insertAssetOnCanvas } from "@/lib/assetInsertion";
 import { clipartSubjectPresets } from "@/lib/clipartPresets";
 import { historyControlAvailability } from "@/lib/canvasHistory";
+import { createShapeLayer, createTextLayer, layerKindLabel } from "@/lib/drawingElements";
+import { duplicateCanvasLayer, patchCanvasLayer, removeCanvasLayer, reorderCanvasLayer } from "@/lib/selectedElementActions";
+import "@/styles/drawingTools.css";
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
-import { Archive, ArrowDownToLine, Brush, ChevronRight, CircleHelp, Eraser, FilePlus2, FolderOpen, Grid2X2, ImagePlus, Layers3, Loader2, LogOut, MoreHorizontal, MousePointer2, Palette, PanelLeftClose, PenLine, Plus, Redo2, RotateCcw, Sparkles, Trash2, Undo2, Upload, WandSparkles } from "lucide-react";
+import { Archive, ArrowDownToLine, ArrowRight, Brush, ChevronRight, Circle, CircleHelp, Copy, Eraser, FilePlus2, FolderOpen, Grid2X2, ImagePlus, Layers3, Loader2, LogOut, Minus, MoreHorizontal, MousePointer2, Palette, PenLine, Plus, Redo2, RotateCcw, Sparkles, Square, Trash2, Type, Undo2, Upload, WandSparkles } from "lucide-react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
 const kindNames: Record<AssetKind, string> = { clipart: "Clipart", border: "Border", header: "Header", drawing: "Drawing", upload: "Upload" };
@@ -88,7 +91,9 @@ export default function Home() {
       const target = event.target as HTMLElement | null;
       if (target?.matches("input, textarea, select") || target?.isContentEditable) return;
       const command = resolveStudioShortcut(event);
-      if (!command) return;
+      const isDelete = event.key.toLowerCase() === "delete" || event.key.toLowerCase() === "backspace";
+      const isDuplicate = (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "d";
+      if (!command && !isDelete && !isDuplicate) return;
       event.preventDefault();
       if (command === "brush") setTool("brush");
       if (command === "eraser") setTool("eraser");
@@ -96,6 +101,8 @@ export default function Home() {
       if (command === "redo") redoCanvas();
       if (command === "save") saveProject();
       if (command === "export") exportWorksheet("pdf");
+      if (isDelete) removeSelected();
+      if (isDuplicate) duplicateSelected();
     };
     window.addEventListener("keydown", handleShortcut);
     return () => window.removeEventListener("keydown", handleShortcut);
@@ -157,24 +164,39 @@ export default function Home() {
 
   function updateSelected(patch: Partial<StudioLayer>) {
     if (!selectedId) return;
-    setCanvas((current) => ({ ...current, layers: current.layers.map((layer) => layer.id === selectedId ? { ...layer, ...patch } as StudioLayer : layer) }));
+    setCanvas((current) => patchCanvasLayer(current, selectedId, patch));
   }
 
   function removeSelected() {
     if (!selectedId) return;
-    setCanvas((current) => ({ ...current, layers: current.layers.filter((layer) => layer.id !== selectedId) }));
+    checkpointCanvas();
+    setCanvas((current) => removeCanvasLayer(current, selectedId));
     setSelectedId(null);
   }
 
+  function duplicateSelected() {
+    if (!selectedLayer) return;
+    checkpointCanvas();
+    const duplicated = duplicateCanvasLayer(canvas, selectedLayer.id, nanoid());
+    if (!duplicated) return;
+    setCanvas(duplicated.canvas);
+    setSelectedId(duplicated.selectedId);
+    setRightPane("properties");
+  }
+
+  function addDrawingElement(nextTool: StudioTool) {
+    if (nextTool === "select" || nextTool === "brush" || nextTool === "eraser") { setTool(nextTool); return; }
+    checkpointCanvas();
+    const layer = nextTool === "text" ? createTextLayer() : createShapeLayer(nextTool);
+    setCanvas((current) => ({ ...current, layers: [...current.layers, layer] }));
+    setSelectedId(layer.id);
+    setTool("select");
+    setRightPane("properties");
+  }
+
   function moveLayer(id: string, direction: "forward" | "back") {
-    setCanvas((current) => {
-      const index = current.layers.findIndex((layer) => layer.id === id);
-      const next = [...current.layers];
-      const target = direction === "forward" ? index + 1 : index - 1;
-      if (index < 0 || target < 0 || target >= next.length) return current;
-      [next[index], next[target]] = [next[target], next[index]];
-      return { ...current, layers: next };
-    });
+    checkpointCanvas();
+    setCanvas((current) => reorderCanvasLayer(current, id, direction));
   }
 
   async function exportWorksheet(format: "png" | "svg" | "pdf") {
@@ -218,6 +240,8 @@ export default function Home() {
       <section className="editor-toolbar">
         <div className="tool-group"><ToolButton active={tool === "select"} label="Select and move" onClick={() => setTool("select")}><MousePointer2 size={17}/></ToolButton><ToolButton active={tool === "brush"} label="Freehand brush" onClick={() => setTool("brush")}><Brush size={17}/></ToolButton><ToolButton active={tool === "eraser"} label="Transparent eraser" onClick={() => setTool("eraser")}><Eraser size={17}/></ToolButton></div>
         <div className="toolbar-divider"/>
+        <div className="tool-group shape-tools"><ToolButton label="Add rectangle" onClick={() => addDrawingElement("rectangle")}><Square size={16}/></ToolButton><ToolButton label="Add ellipse" onClick={() => addDrawingElement("ellipse")}><Circle className="ellipse-icon" size={16}/></ToolButton><ToolButton label="Add line" onClick={() => addDrawingElement("line")}><Minus size={17}/></ToolButton><ToolButton label="Add arrow" onClick={() => addDrawingElement("arrow")}><ArrowRight size={17}/></ToolButton><ToolButton label="Add text" onClick={() => addDrawingElement("text")}><Type size={17}/></ToolButton></div>
+        <div className="toolbar-divider"/>
         <div className="tool-group brush-controls"><label className="color-swatch" style={{ background: brushColor }}><input type="color" value={brushColor} onChange={(event) => setBrushColor(event.target.value)} aria-label="Brush color" /></label><div className="stroke-control"><span>Stroke</span><Slider value={[brushSize]} onValueChange={(value) => setBrushSize(value[0] ?? 12)} min={2} max={60} step={1} className="w-20"/><strong>{brushSize}</strong></div><div className="stroke-control pressure-control"><span>Pressure</span><Slider value={[pressureSensitivity]} onValueChange={(value) => setPressureSensitivity(value[0] ?? 1)} min={0.45} max={1.45} step={0.05} className="w-20"/><strong>{pressureSensitivity < 0.75 ? "Soft" : pressureSensitivity > 1.2 ? "Bold" : "Balanced"}</strong></div></div>
         <div className="toolbar-spacer"/>
         <button className="outline-action" onClick={() => setCanvas((current) => ({ ...current, transparentBackground: !current.transparentBackground }))}><span className={`transparency-icon ${canvas.transparentBackground ? "is-on" : ""}`}/>{canvas.transparentBackground ? "Transparent" : "White background"}</button>
@@ -235,7 +259,7 @@ export default function Home() {
           <Tabs value={rightPane} onValueChange={(value) => setRightPane(value as typeof rightPane)}>
             <TabsList className="inspector-tabs"><TabsTrigger value="properties">Properties</TabsTrigger><TabsTrigger value="layers">Layers</TabsTrigger><TabsTrigger value="assets">Library</TabsTrigger></TabsList>
           </Tabs>
-          {rightPane === "properties" && <PropertiesPanel selected={selectedLayer} onChange={updateSelected} onRemove={removeSelected} onForward={() => selectedId && moveLayer(selectedId, "forward")} onBack={() => selectedId && moveLayer(selectedId, "back")} />}
+          {rightPane === "properties" && <PropertiesPanel selected={selectedLayer} onChange={updateSelected} onRemove={removeSelected} onDuplicate={duplicateSelected} onForward={() => selectedId && moveLayer(selectedId, "forward")} onBack={() => selectedId && moveLayer(selectedId, "back")} />}
           {rightPane === "layers" && <LayersPanel layers={canvas.layers} selectedId={selectedId} onSelect={setSelectedId} onForward={moveLayer} onBack={moveLayer} />}
           {rightPane === "assets" && <AssetLibrary assets={assets} loading={assetsLoading} onAdd={addAssetToCanvas} onUpload={() => fileRef.current?.click()} onGenerate={() => setGeneratorOpen(true)} onRemove={(assetId) => deleteAsset.mutate({ assetId })}/>} 
           <input ref={fileRef} type="file" accept="image/*" className="sr-only" onChange={uploadAsset}/>
@@ -255,14 +279,15 @@ function Welcome({ onLogin }: { onLogin: () => void }) { return <div className="
 
 export function QuickClipartDialog({ open, onOpenChange, loading, onGenerate }: { open: boolean; onOpenChange: (value: boolean) => void; loading: boolean; onGenerate: (prompt: string) => void }) { const [prompt, setPrompt] = useState(""); return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="generate-dialog quick-clipart-dialog"><DialogHeader><div className="generator-icon"><Sparkles size={19}/></div><DialogTitle>Create custom clipart</DialogTitle><p>Describe one original worksheet element. Paperloom will create it with a transparent background, add it to this canvas, and save it in your library.</p></DialogHeader><div className="preset-field"><Label>Start with a subject</Label><div className="preset-chips">{clipartSubjectPresets.map((preset) => <button key={preset.subject} type="button" onClick={() => setPrompt(preset.prompt)}>{preset.subject}</button>)}</div></div><div className="generate-field"><Label htmlFor="quick-clipart-prompt">Describe your clipart</Label><Input id="quick-clipart-prompt" autoFocus placeholder="e.g. a cheerful owl holding a pencil" value={prompt} onChange={(event) => setPrompt(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") onGenerate(prompt); }} /></div><div className="transparent-note"><span className="transparency-icon is-on"/><span><strong>Direct-to-canvas</strong> Transparent clipart will be selected on your worksheet when it is ready.</span></div><Button className="generate-submit" disabled={loading || prompt.trim().length < 3} onClick={() => onGenerate(prompt)}>{loading ? <Loader2 className="animate-spin"/> : <WandSparkles size={16}/>}Generate & insert clipart</Button></DialogContent></Dialog>; }
 
-function PropertiesPanel({ selected, onChange, onRemove, onForward, onBack }: { selected: StudioLayer | null; onChange: (patch: Partial<StudioLayer>) => void; onRemove: () => void; onForward: () => void; onBack: () => void }) {
+function PropertiesPanel({ selected, onChange, onRemove, onDuplicate, onForward, onBack }: { selected: StudioLayer | null; onChange: (patch: Partial<StudioLayer>) => void; onRemove: () => void; onDuplicate: () => void; onForward: () => void; onBack: () => void }) {
   if (!selected) return <div className="empty-inspector"><div className="empty-orb"><MousePointer2 size={22}/></div><h3>Select an element</h3><p>Choose an asset or drawing on your worksheet to adjust its scale, position, and appearance.</p></div>;
-  return <div className="property-panel"><div className="selection-heading"><div className="layer-thumbnail">{selected.type === "image" ? <img src={selected.src} alt=""/> : <Brush size={18}/>}</div><div><strong>{selected.name}</strong><span>{selected.type === "image" ? "Image element" : selected.mode === "erase" ? "Transparent erase" : "Freehand drawing"}</span></div><button onClick={onRemove} className="icon-danger" aria-label="Delete element"><Trash2 size={16}/></button></div><div className="property-section"><label>Opacity <strong>{Math.round(selected.opacity * 100)}%</strong></label><Slider value={[selected.opacity * 100]} min={10} max={100} step={1} onValueChange={(value) => onChange({ opacity: (value[0] ?? 100) / 100 })}/></div>{selected.type === "image" ? <><div className="property-section"><label>Position</label><div className="dual-input"><NumberInput label="X" value={selected.x} onChange={(x) => onChange({ x })}/><NumberInput label="Y" value={selected.y} onChange={(y) => onChange({ y })}/></div></div><div className="property-section"><label>Dimensions</label><div className="dual-input"><NumberInput label="W" value={selected.width} min={40} onChange={(width) => onChange({ width })}/><NumberInput label="H" value={selected.height} min={40} onChange={(height) => onChange({ height })}/></div></div><div className="property-section"><label>Rotation</label><div className="rotation-control"><RotateCcw size={15}/><Slider value={[selected.rotation]} min={-180} max={180} step={1} onValueChange={(value) => onChange({ rotation: value[0] ?? 0 })}/><strong>{selected.rotation}°</strong></div></div></> : <div className="property-section"><label>Stroke</label><div className="path-style"><span className="brush-dot" style={{ background: selected.mode === "erase" ? "#d1d1d1" : selected.color, width: Math.min(selected.strokeWidth, 28), height: Math.min(selected.strokeWidth, 28) }}/><span>{selected.strokeWidth}px {selected.mode === "erase" ? "eraser" : "brush"}</span></div></div>}<div className="arrange-row"><button onClick={onBack}>Send backward</button><button onClick={onForward}>Bring forward</button></div></div>;
+  const visualType = layerKindLabel(selected);
+  return <div className="property-panel"><div className="selection-heading"><div className="layer-thumbnail">{selected.type === "image" ? <img src={selected.src} alt=""/> : selected.type === "text" ? <Type size={18}/> : selected.type === "shape" ? <Square size={18}/> : <Brush size={18}/>}</div><div><strong>{selected.name}</strong><span>{visualType}</span></div><button onClick={onRemove} className="icon-danger" aria-label="Delete element"><Trash2 size={16}/></button></div><div className="property-section"><label>Opacity <strong>{Math.round(selected.opacity * 100)}%</strong></label><Slider value={[selected.opacity * 100]} min={10} max={100} step={1} onValueChange={(value) => onChange({ opacity: (value[0] ?? 100) / 100 })}/></div>{selected.type === "text" ? <><div className="property-section"><label>Text</label><Input value={selected.text} maxLength={120} onChange={(event) => onChange({ text: event.target.value, name: event.target.value || "Text label" })}/></div><div className="property-section"><label>Style</label><div className="style-row"><label className="color-swatch" style={{ background: selected.color }}><input type="color" value={selected.color} onChange={(event) => onChange({ color: event.target.value })}/></label><NumberInput label="Size" value={selected.fontSize} min={12} onChange={(fontSize) => onChange({ fontSize, height: Math.max(34, fontSize * 1.35) })}/><button className={`format-toggle ${selected.fontWeight === "bold" ? "is-active" : ""}`} onClick={() => onChange({ fontWeight: selected.fontWeight === "bold" ? "normal" : "bold" })}>B</button></div></div></> : selected.type === "shape" ? <><div className="property-section"><label>{selected.shape === "line" || selected.shape === "arrow" ? "Stroke" : "Fill & stroke"}</label><div className="style-row"><label className="color-swatch" style={{ background: selected.stroke }}><input type="color" value={selected.stroke} onChange={(event) => onChange({ stroke: event.target.value })}/></label>{selected.fill !== "none" ? <label className="color-swatch" style={{ background: selected.fill }}><input type="color" value={selected.fill} onChange={(event) => onChange({ fill: event.target.value })}/></label> : null}<NumberInput label="Width" value={selected.strokeWidth} min={1} onChange={(strokeWidth) => onChange({ strokeWidth })}/></div></div>{selected.fill !== "none" ? <div className="property-section"><label>Fill opacity <strong>{Math.round(selected.fillOpacity * 100)}%</strong></label><Slider value={[selected.fillOpacity * 100]} min={0} max={100} step={1} onValueChange={(value) => onChange({ fillOpacity: (value[0] ?? 0) / 100 })}/></div> : null}</> : selected.type === "image" ? <><div className="property-section"><label>Position</label><div className="dual-input"><NumberInput label="X" value={selected.x} onChange={(x) => onChange({ x })}/><NumberInput label="Y" value={selected.y} onChange={(y) => onChange({ y })}/></div></div><div className="property-section"><label>Dimensions</label><div className="dual-input"><NumberInput label="W" value={selected.width} min={40} onChange={(width) => onChange({ width })}/><NumberInput label="H" value={selected.height} min={40} onChange={(height) => onChange({ height })}/></div></div></> : <div className="property-section"><label>Stroke</label><div className="path-style"><span className="brush-dot" style={{ background: selected.mode === "erase" ? "#d1d1d1" : selected.color, width: Math.min(selected.strokeWidth, 28), height: Math.min(selected.strokeWidth, 28) }}/><span>{selected.strokeWidth}px {selected.mode === "erase" ? "eraser" : "brush"}</span></div></div>} {selected.type !== "path" ? <div className="property-section"><label>Position</label><div className="dual-input"><NumberInput label="X" value={selected.x} onChange={(x) => onChange({ x })}/><NumberInput label="Y" value={selected.y} onChange={(y) => onChange({ y })}/></div></div> : null}{selected.type !== "path" ? <div className="property-section"><label>Rotation</label><div className="rotation-control"><RotateCcw size={15}/><Slider value={[selected.rotation]} min={-180} max={180} step={1} onValueChange={(value) => onChange({ rotation: value[0] ?? 0 })}/><strong>{selected.rotation}°</strong></div></div> : null}<div className="arrange-row arrange-row--three"><button onClick={onBack}>Back</button><button onClick={onDuplicate}><Copy size={13}/>Duplicate</button><button onClick={onForward}>Forward</button></div></div>;
 }
 
 function NumberInput({ label, value, min, onChange }: { label: string; value: number; min?: number; onChange: (value: number) => void }) { return <label className="number-field"><span>{label}</span><input type="number" min={min} value={Math.round(value)} onChange={(event) => onChange(Number(event.target.value) || 0)}/></label>; }
 
-function LayersPanel({ layers, selectedId, onSelect, onForward, onBack }: { layers: StudioLayer[]; selectedId: string | null; onSelect: (id: string) => void; onForward: (id: string, direction: "forward" | "back") => void; onBack: (id: string, direction: "forward" | "back") => void }) { if (!layers.length) return <div className="empty-inspector"><div className="empty-orb"><Layers3 size={22}/></div><h3>No elements yet</h3><p>Create an AI asset, upload a favorite, or take up the brush to begin your composition.</p></div>; return <div className="layer-list">{[...layers].reverse().map((layer) => <div key={layer.id} className={`layer-row ${layer.id === selectedId ? "is-active" : ""}`} onClick={() => onSelect(layer.id)}><div className="layer-thumb">{layer.type === "image" ? <img src={layer.src} alt=""/> : <Brush size={15}/>}</div><div><strong>{layer.name}</strong><span>{layer.type === "image" ? "Image" : "Drawing"}</span></div><button aria-label="Layer actions" onClick={(event) => { event.stopPropagation(); onForward(layer.id, "forward"); }}><MoreHorizontal size={16}/></button></div>)}</div>; }
+function LayersPanel({ layers, selectedId, onSelect, onForward, onBack }: { layers: StudioLayer[]; selectedId: string | null; onSelect: (id: string) => void; onForward: (id: string, direction: "forward" | "back") => void; onBack: (id: string, direction: "forward" | "back") => void }) { if (!layers.length) return <div className="empty-inspector"><div className="empty-orb"><Layers3 size={22}/></div><h3>No elements yet</h3><p>Create an AI asset, upload a favorite, add a shape, or take up the brush to begin your composition.</p></div>; return <div className="layer-list">{[...layers].reverse().map((layer) => <div key={layer.id} className={`layer-row ${layer.id === selectedId ? "is-active" : ""}`} onClick={() => onSelect(layer.id)}><div className="layer-thumb">{layer.type === "image" ? <img src={layer.src} alt=""/> : layer.type === "text" ? <Type size={15}/> : layer.type === "shape" ? <Square size={15}/> : <Brush size={15}/>}</div><div><strong>{layer.name}</strong><span>{layerKindLabel(layer)}</span></div><button aria-label="Bring layer forward" onClick={(event) => { event.stopPropagation(); onForward(layer.id, "forward"); }}><MoreHorizontal size={16}/></button></div>)}</div>; }
 
 function AssetLibrary({ assets, loading, onAdd, onUpload, onGenerate, onRemove }: { assets: Array<{ id: number; name: string; url: string; kind: string; prompt?: string | null }>; loading: boolean; onAdd: (asset: { id: number; name: string; url: string; kind: string }) => void; onUpload: () => void; onGenerate: () => void; onRemove: (id: number) => void }) { return <div className="asset-library"><div className="library-header"><div><strong>Your asset history</strong><span>Reusable across every worksheet.</span></div><button onClick={onUpload} aria-label="Upload image"><Upload size={17}/></button></div><div className="library-actions"><button onClick={onGenerate}><WandSparkles size={15}/>Generate</button><button onClick={onUpload}><ImagePlus size={15}/>Upload</button></div>{loading ? <div className="library-empty"><Loader2 className="animate-spin"/></div> : !assets.length ? <div className="library-empty"><div className="empty-orb"><Archive size={20}/></div><h3>Your library is ready</h3><p>Generated and uploaded elements will stay here for every future project.</p><Button onClick={onGenerate}><Sparkles size={15}/>Create your first asset</Button></div> : <div className="asset-grid">{assets.map((asset) => <div className="asset-card" key={asset.id}><button className="asset-preview" onClick={() => onAdd(asset)}><img src={asset.url} alt={asset.name}/><span>{kindNames[asset.kind as AssetKind] ?? "Asset"}</span></button><div><strong title={asset.name}>{asset.name}</strong><button onClick={() => onRemove(asset.id)} aria-label={`Remove ${asset.name}`}><Trash2 size={14}/></button></div></div>)}</div>}</div>; }
 
