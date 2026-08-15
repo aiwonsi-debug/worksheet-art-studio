@@ -19,3 +19,9 @@
 - [x] Add explicit recovery feedback when opening a saved worksheet fails.
 - [x] Expand router tests across create, update, asset save, generation, and removal procedure contracts.
 - [x] Save the verified delivery checkpoint.
+- [x] Support pressure-sensitive stylus input with a stable mouse and touch fallback.
+- [x] Recognize pen eraser input and suppress non-pen gestures while the stylus is drawing.
+- [x] Add pen-display setup guidance and a calibration check for VEIKK VK1200 V2 users.
+- [x] Add automated tests for stylus input normalization and pressure-aware stroke behavior.
+- [x] Verify the pen-display-ready editor and save a delivery checkpoint.
+- [x] Save the verified VEIKK VK1200 V2 compatibility delivery checkpoint.

@@ -3,8 +3,9 @@ import { useRef, useState } from "react";
 import { nanoid } from "nanoid";
 import type { StudioLayer, StudioTool, WorksheetCanvasState } from "@/lib/studioTypes";
 import { WORKSHEET_HEIGHT, WORKSHEET_WIDTH } from "@/lib/studioTypes";
+import { pressureAdjustedStroke, resolveStylusInput } from "@/lib/penInput";
 
-type PointerSession = { kind: "draw"; id: string } | { kind: "move"; id: string; originX: number; originY: number; layerX: number; layerY: number } | null;
+type PointerSession = { kind: "draw"; id: string; pointerId: number; baseSize: number; isPen: boolean } | { kind: "move"; id: string; pointerId: number; originX: number; originY: number; layerX: number; layerY: number; isPen: boolean } | null;
 
 type Props = {
   state: WorksheetCanvasState;
@@ -14,11 +15,13 @@ type Props = {
   tool: StudioTool;
   brushColor: string;
   brushSize: number;
+  onPenDetected?: () => void;
 };
 
-export default function WorksheetCanvas({ state, onChange, selectedId, onSelect, tool, brushColor, brushSize }: Props) {
+export default function WorksheetCanvas({ state, onChange, selectedId, onSelect, tool, brushColor, brushSize, onPenDetected }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
   const pointerRef = useRef<PointerSession>(null);
+  const activePenPointerId = useRef<number | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
 
   const point = (event: ReactPointerEvent<SVGSVGElement>) => {
@@ -33,49 +36,58 @@ export default function WorksheetCanvas({ state, onChange, selectedId, onSelect,
   const updateLayer = (id: string, update: (layer: StudioLayer) => StudioLayer) => onChange({ ...state, layers: state.layers.map((layer) => layer.id === id ? update(layer) : layer) });
 
   const handlePointerDown = (event: ReactPointerEvent<SVGSVGElement>) => {
+    const stylus = resolveStylusInput(event, activePenPointerId.current !== null);
+    if (stylus.shouldIgnore) return;
+    if (stylus.isPen) { activePenPointerId.current = event.pointerId; onPenDetected?.(); }
     const target = event.target as Element;
     const layerId = target.closest("[data-layer-id]")?.getAttribute("data-layer-id");
     const current = point(event);
-    if (tool === "select" && layerId) {
+    const activeTool = stylus.isEraser ? "eraser" : tool;
+    if (activeTool === "select" && layerId) {
       const layer = state.layers.find((item) => item.id === layerId);
       if (!layer) return;
       onSelect(layerId);
-      pointerRef.current = { kind: "move", id: layerId, originX: current.x, originY: current.y, layerX: layer.x, layerY: layer.y };
+      pointerRef.current = { kind: "move", id: layerId, pointerId: event.pointerId, originX: current.x, originY: current.y, layerX: layer.x, layerY: layer.y, isPen: stylus.isPen };
       event.currentTarget.setPointerCapture(event.pointerId);
       return;
     }
-    if (tool === "select") {
+    if (activeTool === "select") {
       onSelect(null);
       return;
     }
     const id = nanoid();
-    const layer: StudioLayer = { id, type: "path", name: tool === "eraser" ? "Transparent erase" : "Freehand stroke", d: `M ${current.x} ${current.y}`, color: brushColor, strokeWidth: brushSize, mode: tool === "eraser" ? "erase" : "draw", x: 0, y: 0, width: 0, height: 0, rotation: 0, opacity: 1 };
+    const strokeWidth = pressureAdjustedStroke(brushSize, stylus.pressure, stylus.isPen);
+    const layer: StudioLayer = { id, type: "path", name: activeTool === "eraser" ? "Transparent erase" : stylus.isPen ? "Pressure brush stroke" : "Freehand stroke", d: `M ${current.x} ${current.y}`, color: brushColor, strokeWidth, mode: activeTool === "eraser" ? "erase" : "draw", x: 0, y: 0, width: 0, height: 0, rotation: 0, opacity: 1 };
     onChange({ ...state, layers: [...state.layers, layer] });
     onSelect(id);
-    pointerRef.current = { kind: "draw", id };
+    pointerRef.current = { kind: "draw", id, pointerId: event.pointerId, baseSize: brushSize, isPen: stylus.isPen };
     setIsDrawing(true);
     event.currentTarget.setPointerCapture(event.pointerId);
   };
 
   const handlePointerMove = (event: ReactPointerEvent<SVGSVGElement>) => {
     const session = pointerRef.current;
-    if (!session) return;
+    if (!session || session.pointerId !== event.pointerId) return;
+    const stylus = resolveStylusInput(event, session.isPen);
+    if (stylus.shouldIgnore || (session.isPen && !stylus.isPen)) return;
     const current = point(event);
     if (session.kind === "draw") {
-      updateLayer(session.id, (layer) => layer.type === "path" ? { ...layer, d: `${layer.d} L ${current.x} ${current.y}` } : layer);
+      updateLayer(session.id, (layer) => layer.type === "path" ? { ...layer, d: `${layer.d} L ${current.x} ${current.y}`, strokeWidth: pressureAdjustedStroke(session.baseSize, stylus.pressure, session.isPen) } : layer);
       return;
     }
     updateLayer(session.id, (layer) => ({ ...layer, x: Math.max(-layer.width / 2, Math.min(WORKSHEET_WIDTH - layer.width / 2, session.layerX + current.x - session.originX)), y: Math.max(-layer.height / 2, Math.min(WORKSHEET_HEIGHT - layer.height / 2, session.layerY + current.y - session.originY)) }));
   };
 
-  const stopPointer = () => {
+  const stopPointer = (event: ReactPointerEvent<SVGSVGElement>) => {
+    if (pointerRef.current && pointerRef.current.pointerId !== event.pointerId) return;
+    if (activePenPointerId.current === event.pointerId) activePenPointerId.current = null;
     pointerRef.current = null;
     setIsDrawing(false);
   };
 
   return (
     <div className={`worksheet-stage ${isDrawing ? "is-drawing" : ""}`}>
-      <svg ref={svgRef} viewBox={`0 0 ${WORKSHEET_WIDTH} ${WORKSHEET_HEIGHT}`} className={`worksheet-paper ${state.transparentBackground ? "is-transparent" : ""}`} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={stopPointer} onPointerCancel={stopPointer} aria-label="Editable worksheet canvas">
+      <svg ref={svgRef} viewBox={`0 0 ${WORKSHEET_WIDTH} ${WORKSHEET_HEIGHT}`} className={`worksheet-paper ${state.transparentBackground ? "is-transparent" : ""}`} style={{ touchAction: "none" }} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={stopPointer} onPointerCancel={stopPointer} onLostPointerCapture={stopPointer} aria-label="Editable worksheet canvas">
         <defs>
           <pattern id="checker" width="28" height="28" patternUnits="userSpaceOnUse"><rect width="28" height="28" fill="#fff"/><rect width="14" height="14" fill="#f5f4f1"/><rect x="14" y="14" width="14" height="14" fill="#f5f4f1"/></pattern>
         </defs>
