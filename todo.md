@@ -89,3 +89,8 @@
 - [x] Add interaction tests, verify desktop and tablet layouts, and save the workspace-refresh checkpoint.
 - [x] Preserve finger-based brush and eraser drawing while keeping an explicit touch navigation gesture for panning and pinch zoom.
 - [x] Add regression coverage for the touch-navigation gesture selection and resave the completed workspace-refresh checkpoint.
+- [x] Render strokes as smooth filled ribbons with tapered stroke starts and ends for a real pen feel.
+- [x] Add pressure-curve easing so width transitions between samples are gradual rather than abrupt.
+- [x] Apply the ribbon geometry consistently to canvas rendering and SVG/PNG/PDF export.
+- [x] Add regression coverage for ribbon geometry, tapering, and pressure easing.
+- [x] Visually verify natural stroke appearance and save the brush-rendering checkpoint.
