@@ -6,6 +6,14 @@ export function normalizeWorksheetTitle(title: string) {
   return normalized || "Untitled worksheet";
 }
 
+export const ASSET_NAME_LIMIT = 160;
+
+export function normalizeAssetName(name: string) {
+  const normalized = name.trim().replace(/\s+/g, " ");
+  const shortened = normalized.slice(0, ASSET_NAME_LIMIT).trim();
+  return shortened || "Untitled asset";
+}
+
 export function assertOwnedResource(ownerId: number, requesterId: number) {
   if (ownerId !== requesterId) throw new Error("The requested resource does not belong to this user.");
 }

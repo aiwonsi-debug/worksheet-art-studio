@@ -42,3 +42,7 @@
 - [x] Save the verified presets, pressure, and canvas-history delivery checkpoint.
 - [x] Add a regression test confirming subject-preset selection supplies the prompt used for custom clipart generation.
 - [x] Save the verified presets, pressure sensitivity, history controls, and preset-interaction test checkpoint.
+- [x] Normalize generated asset names to the server’s 160-character limit while preserving full prompts for image generation.
+- [x] Add regression coverage for long custom clipart prompts and asset-generation input validation.
+- [x] Validate the asset-generation fix and save a delivery checkpoint.
+- [x] Save the validated long-prompt asset-generation repair checkpoint.

@@ -1,10 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { assertOwnedResource, buildWorksheetAssetPrompt, decodeImageDataUrl, normalizeWorksheetTitle } from "./worksheetUtils";
+import { ASSET_NAME_LIMIT, assertOwnedResource, buildWorksheetAssetPrompt, decodeImageDataUrl, normalizeAssetName, normalizeWorksheetTitle } from "./worksheetUtils";
 
 describe("worksheet safeguards", () => {
   it("normalizes a project title without allowing an empty project name", () => {
     expect(normalizeWorksheetTitle("  My   weather  page  ")).toBe("My weather page");
     expect(normalizeWorksheetTitle("  ")).toBe("Untitled worksheet");
+  });
+
+  it("shortens a long asset name while retaining a safe readable label", () => {
+    const detailedPrompt = "cute black-and-white doodle of a smiling cat sitting with its tail curled around its paws, simple bold ink outlines, minimal child-friendly worksheet clipart, no shading, no text, transparent background";
+    const repeatedPrompt = `${detailedPrompt} ${detailedPrompt}`;
+
+    expect(normalizeAssetName(repeatedPrompt)).toHaveLength(ASSET_NAME_LIMIT);
+    expect(normalizeAssetName("  cheerful   apple  ")).toBe("cheerful apple");
+    expect(normalizeAssetName("   ")).toBe("Untitled asset");
   });
 
   it("does not permit one user to access another user’s resource", () => {
@@ -26,4 +35,3 @@ describe("worksheet safeguards", () => {
     expect(() => decodeImageDataUrl("not-a-data-url")).toThrow("valid image data URL");
   });
 });
-

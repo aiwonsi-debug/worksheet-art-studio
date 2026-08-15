@@ -95,4 +95,20 @@ describe("worksheet router user isolation contracts", () => {
     expect(dbMocks.createAsset).toHaveBeenNthCalledWith(2, expect.objectContaining({ userId: 12, kind: "clipart", name: "Generated fox", url: "/manus-storage/generated.png" }));
     expect(dbMocks.deleteAsset).toHaveBeenCalledWith(12, 6);
   });
+
+  it("accepts long custom clipart descriptions and persists a valid shortened asset name", async () => {
+    dbMocks.generateImage.mockResolvedValue({ url: "/manus-storage/generated.png" });
+    dbMocks.createAsset.mockResolvedValue({ id: 7 });
+    const caller = appRouter.createCaller(createContext(12));
+    const longDescription = "cute black-and-white doodle of a smiling cat sitting with its tail curled around its paws, simple bold ink outlines, minimal child-friendly worksheet clipart, no shading, no text, transparent background ".repeat(2);
+
+    await expect(caller.asset.generate({ kind: "clipart", name: longDescription, prompt: longDescription })).resolves.toEqual({ id: 7 });
+
+    expect(dbMocks.createAsset).toHaveBeenCalledWith(expect.objectContaining({
+      userId: 12,
+      kind: "clipart",
+      name: expect.stringMatching(/^cute black-and-white doodle/),
+    }));
+    expect((dbMocks.createAsset.mock.calls[0]?.[0] as { name: string }).name).toHaveLength(160);
+  });
 });
