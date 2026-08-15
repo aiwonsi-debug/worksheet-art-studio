@@ -20,6 +20,15 @@ describe("worksheet SVG export", () => {
     expect(svg).toContain("fill=\"#ffffff\"");
   });
 
+  it("keeps a locked imported PDF-page background beneath drawn annotations in export output", () => {
+    const svg = renderWorksheetSvg({ transparentBackground: false, layers: [
+      { id: "pdf", type: "image", name: "Lesson PDF page", src: "data:image/png;base64,cGRm", x: 12, y: 0, width: 896, height: 1160, rotation: 0, opacity: 1, locked: true },
+      { id: "ink", type: "path", name: "Annotation", d: "M 10 10", color: "#4263eb", strokeWidth: 12, mode: "draw", x: 0, y: 0, width: 0, height: 0, rotation: 0, opacity: 1, points: [{ x: 10, y: 10, size: 8 }, { x: 50, y: 30, size: 12 }] },
+    ] });
+    expect(svg.indexOf("data:image/png;base64,cGRm")).toBeGreaterThan(-1);
+    expect(svg.indexOf('fill="#4263eb"')).toBeGreaterThan(svg.indexOf("data:image/png;base64,cGRm"));
+  });
+
   it("renders ink strokes as a closed filled ribbon with pressure-tapered widths in SVG exports", () => {
     const svg = renderWorksheetSvg({ transparentBackground: true, layers: [{ id: "p", type: "path", name: "stroke", d: "M 0 0", color: "#4263eb", strokeWidth: 12, mode: "draw", x: 0, y: 0, width: 0, height: 0, rotation: 0, opacity: 1, points: [{ x: 1, y: 2, size: 4 }, { x: 8, y: 9, size: 15 }, { x: 20, y: 14, size: 10 }] }] });
     expect(svg).toContain('fill="#4263eb"');

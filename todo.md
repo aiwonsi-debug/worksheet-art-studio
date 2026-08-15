@@ -100,4 +100,5 @@
 - [x] Preserve imported PDF-page backgrounds in save/load state and PNG/PDF/SVG exports.
 - [x] Add PDF-import helper regression coverage and verify the PDF-import entry point.
 - [x] Verify PDF page rendering in a real browser with the production import engine and verify that background insertion keeps annotations above the locked page in the exported canvas state.
-- [ ] Save the verified PDF annotation workflow as a new delivery checkpoint.
+- [x] Verify imported PDF backgrounds persist through saved worksheet state and remain behind annotations in PNG/PDF/SVG output.
+- [ ] Save the fully verified PDF annotation workflow as a new delivery checkpoint.

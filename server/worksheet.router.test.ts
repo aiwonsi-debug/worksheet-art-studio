@@ -80,6 +80,29 @@ describe("worksheet router user isolation contracts", () => {
     expect(dbMocks.updateProject).toHaveBeenCalledWith(9, 3, { title: "Renamed worksheet", canvasData: "{}" });
   });
 
+  it("preserves an imported PDF page and its annotation order through worksheet save and reopen", async () => {
+    const canvasData = JSON.stringify({
+      transparentBackground: false,
+      layers: [
+        { id: "pdf-page", type: "image", name: "Lesson • PDF page", src: "/manus-storage/lesson-page.png", x: 12, y: 0, width: 896, height: 1160, rotation: 0, opacity: 1, locked: true },
+        { id: "note", type: "path", name: "Annotation", d: "M 10 10", color: "#4263eb", strokeWidth: 8, mode: "draw", x: 0, y: 0, width: 0, height: 0, rotation: 0, opacity: 1 },
+      ],
+    });
+    dbMocks.updateProject.mockResolvedValue({ id: 31 });
+    dbMocks.getProject.mockResolvedValue({ id: 31, title: "Annotated lesson", canvasData });
+    const caller = appRouter.createCaller(createContext(9));
+
+    await caller.project.update({ projectId: 31, canvasData });
+    const reopened = await caller.project.get({ projectId: 31 });
+    const restored = JSON.parse(reopened.canvasData);
+
+    expect(dbMocks.updateProject).toHaveBeenCalledWith(9, 31, { title: undefined, canvasData });
+    expect(restored.layers).toEqual([
+      expect.objectContaining({ id: "pdf-page", type: "image", locked: true }),
+      expect.objectContaining({ id: "note", type: "path" }),
+    ]);
+  });
+
   it("persists uploaded and generated assets under the authenticated user before allowing deletion", async () => {
     dbMocks.storagePut.mockResolvedValue({ key: "users/12/assets/file.png", url: "/manus-storage/file.png" });
     dbMocks.generateImage.mockResolvedValue({ url: "/manus-storage/generated.png" });

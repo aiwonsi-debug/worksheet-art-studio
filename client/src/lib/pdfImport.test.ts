@@ -24,5 +24,8 @@ describe("PDF import helpers", () => {
     expect(result.canvas.transparentBackground).toBe(false);
     expect(result.canvas.layers.map((layer) => layer.id)).toEqual(["pdf", "stroke"]);
     expect(result.layer.locked).toBe(true);
+    const restored = JSON.parse(JSON.stringify(result.canvas));
+    expect(restored.layers[0]).toMatchObject({ id: "pdf", locked: true, type: "image" });
+    expect(restored.layers[1]).toMatchObject({ id: "stroke", type: "path" });
   });
 });
