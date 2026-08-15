@@ -1,0 +1,21 @@
+# Project TODO
+
+- [x] Define shared worksheet, canvas layer, asset, drawing, and export data contracts.
+- [x] Add authenticated database persistence for user-owned worksheet projects and reusable assets.
+- [x] Build project creation, save, rename, open, and deletion workflows scoped to the authenticated user.
+- [x] Build a polished editor shell with a responsive navigation rail, contextual inspector, and accessible controls.
+- [x] Implement a layered worksheet canvas supporting adding, selecting, moving, resizing, rotating, reordering, and deleting elements.
+- [x] Implement freehand brush, eraser, color selection, and stroke-size controls with transparent drawing output.
+- [x] Build a persistent personal asset library for clipart, borders, headers, generated assets, and uploaded assets.
+- [x] Integrate AI image generation from text prompts for clipart, borders, and headers with transparent-background requests.
+- [x] Enable applying generated and library assets to the active worksheet canvas.
+- [x] Export worksheet canvases as PNG, PDF, and SVG while preserving transparent-background behavior where supported.
+- [x] Add robust loading, empty, error, authentication, and unsaved-change states.
+- [x] Add and run automated tests for user isolation, persistence contracts, editor utilities, and export rendering.
+- [x] Visually verify desktop and mobile layouts, resolve issues, and prepare delivery checkpoint.
+- [x] Add dirty-state tracking for saved projects plus explicit query and mutation error feedback across project and asset workflows.
+- [x] Add automated router tests for user-isolated project and asset procedure contracts.
+- [x] Create and record the final delivery checkpoint after the reliability verification pass.
+- [x] Add explicit recovery feedback when opening a saved worksheet fails.
+- [x] Expand router tests across create, update, asset save, generation, and removal procedure contracts.
+- [x] Save the verified delivery checkpoint.
