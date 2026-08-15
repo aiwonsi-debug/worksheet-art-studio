@@ -83,3 +83,9 @@
 - [x] Repair discontinuities between adjacent smoothed freehand stroke segments at every smoothing strength.
 - [x] Add regression coverage that proves consecutive curve segments share exact join coordinates.
 - [x] Validate continuous canvas and export stroke rendering, then save the repair checkpoint.
+- [x] Redesign the editor as an original Procreate-inspired touch-first drawing workspace while retaining the Paperloom brand.
+- [x] Add a focused brush library and color-control workflow suited to rapid stylus drawing.
+- [x] Add practical touch-first navigation and layer workflows without removing worksheet-specific tools.
+- [x] Add interaction tests, verify desktop and tablet layouts, and save the workspace-refresh checkpoint.
+- [x] Preserve finger-based brush and eraser drawing while keeping an explicit touch navigation gesture for panning and pinch zoom.
+- [x] Add regression coverage for the touch-navigation gesture selection and resave the completed workspace-refresh checkpoint.

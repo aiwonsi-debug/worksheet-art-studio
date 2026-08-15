@@ -7,6 +7,7 @@ import { createStrokePoint, pressureAdjustedStroke, resolveStylusInput } from "@
 import { fillSelectedShape, sampleLayerColor } from "@/lib/advancedDrawingTools";
 import { shapePoints } from "@/lib/drawingElements";
 import { smoothStrokeSegments, stabilizeStrokePoint } from "@/lib/smoothStroke";
+import { nextViewportFromTouchGesture, shouldNavigateTouch, type CanvasViewport, type ViewportTouchPoint } from "@/lib/canvasViewport";
 
 type PointerSession = { kind: "draw"; id: string; pointerId: number; baseSize: number; sensitivity: number; stabilizer: number; isPen: boolean } | { kind: "move"; id: string; pointerId: number; originX: number; originY: number; layerX: number; layerY: number; isPen: boolean } | null;
 
@@ -52,20 +53,53 @@ export default function WorksheetCanvas({ state, onChange, selectedId, onSelect,
   const svgRef = useRef<SVGSVGElement>(null);
   const pointerRef = useRef<PointerSession>(null);
   const activePenPointerId = useRef<number | null>(null);
+  const touchPointsRef = useRef<Map<number, ViewportTouchPoint>>(new Map());
+  const touchStartRef = useRef<{ viewport: CanvasViewport; points: ViewportTouchPoint[] } | null>(null);
+  const viewportRef = useRef<CanvasViewport>({ scale: 1, offsetX: 0, offsetY: 0 });
+  const [viewport, setViewport] = useState<CanvasViewport>(viewportRef.current);
   const [isDrawing, setIsDrawing] = useState(false);
+
+  const setCanvasViewport = (next: CanvasViewport) => {
+    viewportRef.current = next;
+    setViewport(next);
+  };
+
+  const asViewportTouch = (event: ReactPointerEvent<SVGSVGElement>): ViewportTouchPoint => {
+    const rect = svgRef.current?.getBoundingClientRect();
+    if (!rect) return { id: event.pointerId, x: 0, y: 0 };
+    return { id: event.pointerId, x: ((event.clientX - rect.left) / rect.width) * WORKSHEET_WIDTH, y: ((event.clientY - rect.top) / rect.height) * WORKSHEET_HEIGHT };
+  };
+
+  const resetTouchBaseline = () => {
+    touchStartRef.current = { viewport: viewportRef.current, points: Array.from(touchPointsRef.current.values()) };
+  };
 
   const point = (event: ReactPointerEvent<SVGSVGElement>) => {
     const rect = svgRef.current?.getBoundingClientRect();
     if (!rect) return { x: 0, y: 0 };
-    return {
-      x: Math.max(0, Math.min(WORKSHEET_WIDTH, ((event.clientX - rect.left) / rect.width) * WORKSHEET_WIDTH)),
-      y: Math.max(0, Math.min(WORKSHEET_HEIGHT, ((event.clientY - rect.top) / rect.height) * WORKSHEET_HEIGHT)),
-    };
+    const x = (((event.clientX - rect.left) / rect.width) * WORKSHEET_WIDTH - viewportRef.current.offsetX) / viewportRef.current.scale;
+    const y = (((event.clientY - rect.top) / rect.height) * WORKSHEET_HEIGHT - viewportRef.current.offsetY) / viewportRef.current.scale;
+    return { x: Math.max(0, Math.min(WORKSHEET_WIDTH, x)), y: Math.max(0, Math.min(WORKSHEET_HEIGHT, y)) };
   };
 
   const updateLayer = (id: string, update: (layer: StudioLayer) => StudioLayer) => onChange({ ...state, layers: state.layers.map((layer) => layer.id === id ? update(layer) : layer) });
 
   const handlePointerDown = (event: ReactPointerEvent<SVGSVGElement>) => {
+    if (event.pointerType === "touch") {
+      touchPointsRef.current.set(event.pointerId, asViewportTouch(event));
+      event.currentTarget.setPointerCapture(event.pointerId);
+      if (shouldNavigateTouch(touchPointsRef.current.size)) {
+        const activeSession = pointerRef.current;
+        if (activeSession?.kind === "draw") {
+          onChange({ ...state, layers: state.layers.filter((layer) => layer.id !== activeSession.id) });
+          onSelect(null);
+        }
+        pointerRef.current = null;
+        setIsDrawing(false);
+        resetTouchBaseline();
+        return;
+      }
+    }
     const stylus = resolveStylusInput(event, activePenPointerId.current !== null);
     if (stylus.shouldIgnore) return;
     if (stylus.isPen) { activePenPointerId.current = event.pointerId; onPenDetected?.(); }
@@ -111,6 +145,12 @@ export default function WorksheetCanvas({ state, onChange, selectedId, onSelect,
   };
 
   const handlePointerMove = (event: ReactPointerEvent<SVGSVGElement>) => {
+    if (event.pointerType === "touch" && touchPointsRef.current.has(event.pointerId) && shouldNavigateTouch(touchPointsRef.current.size)) {
+      touchPointsRef.current.set(event.pointerId, asViewportTouch(event));
+      const start = touchStartRef.current;
+      if (start) setCanvasViewport(nextViewportFromTouchGesture(start.viewport, start.points, Array.from(touchPointsRef.current.values())));
+      return;
+    }
     const session = pointerRef.current;
     if (!session || session.pointerId !== event.pointerId) return;
     const stylus = resolveStylusInput(event, session.isPen);
@@ -130,6 +170,11 @@ export default function WorksheetCanvas({ state, onChange, selectedId, onSelect,
   };
 
   const stopPointer = (event: ReactPointerEvent<SVGSVGElement>) => {
+    if (event.pointerType === "touch") {
+      touchPointsRef.current.delete(event.pointerId);
+      resetTouchBaseline();
+      if (!pointerRef.current || pointerRef.current.pointerId !== event.pointerId) return;
+    }
     if (pointerRef.current && pointerRef.current.pointerId !== event.pointerId) return;
     if (activePenPointerId.current === event.pointerId) activePenPointerId.current = null;
     pointerRef.current = null;
@@ -138,12 +183,13 @@ export default function WorksheetCanvas({ state, onChange, selectedId, onSelect,
 
   return (
     <div className={`worksheet-stage ${isDrawing ? "is-drawing" : ""}`}>
-      <svg ref={svgRef} viewBox={`0 0 ${WORKSHEET_WIDTH} ${WORKSHEET_HEIGHT}`} className={`worksheet-paper ${state.transparentBackground ? "is-transparent" : ""}`} style={{ touchAction: "none" }} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={stopPointer} onPointerCancel={stopPointer} onLostPointerCapture={stopPointer} aria-label="Editable worksheet canvas">
+      <svg ref={svgRef} viewBox={`0 0 ${WORKSHEET_WIDTH} ${WORKSHEET_HEIGHT}`} className={`worksheet-paper ${state.transparentBackground ? "is-transparent" : ""}`} style={{ touchAction: "none" }} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={stopPointer} onPointerCancel={stopPointer} onLostPointerCapture={stopPointer} onDoubleClick={() => setCanvasViewport({ scale: 1, offsetX: 0, offsetY: 0 })} aria-label="Editable worksheet canvas">
         <defs>
           <pattern id="checker" width="28" height="28" patternUnits="userSpaceOnUse"><rect width="28" height="28" fill="#fff"/><rect width="14" height="14" fill="#f5f4f1"/><rect x="14" y="14" width="14" height="14" fill="#f5f4f1"/></pattern>
           <marker id="paperloom-arrow" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto" markerUnits="strokeWidth"><path d="M 0 0 L 8 4 L 0 8 z" fill="#42634f"/></marker>
         </defs>
         <rect width={WORKSHEET_WIDTH} height={WORKSHEET_HEIGHT} fill={state.transparentBackground ? "url(#checker)" : "#fff"} />
+        <g transform={`translate(${viewport.offsetX} ${viewport.offsetY}) scale(${viewport.scale})`}>
         <g style={{ isolation: "isolate" }}>
           {state.layers.map((layer) => {
             const active = layer.id === selectedId;
@@ -153,6 +199,7 @@ export default function WorksheetCanvas({ state, onChange, selectedId, onSelect,
               {active && layer.type !== "path" ? <rect className="selection-box" x={layer.x} y={layer.y} width={layer.width} height={layer.height || Math.max(layer.type === "shape" ? layer.strokeWidth : 0, 18)} fill="none" /> : null}
             </g>;
           })}
+        </g>
         </g>
       </svg>
     </div>

@@ -22,6 +22,7 @@ import { createShapeLayer, createTextLayer, layerKindLabel } from "@/lib/drawing
 import { clearCanvasLayers, duplicateCanvasLayer, patchCanvasLayer, removeCanvasLayer, reorderCanvasLayer } from "@/lib/selectedElementActions";
 import { brushPresets, isActiveBrushPreset } from "@/lib/brushPresets";
 import "@/styles/drawingTools.css";
+import "@/styles/artStudio.css";
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
 import { Archive, ArrowDownToLine, ArrowRight, Brush, ChevronRight, Circle, CircleHelp, Copy, Diamond, Eraser, FilePlus2, FolderOpen, Grid2X2, ImagePlus, Layers3, Loader2, LogOut, Minus, MoreHorizontal, MousePointer2, PaintBucket, Palette, PenLine, Pipette, Plus, Redo2, RotateCcw, Sparkles, Square, Star, Trash2, Triangle, Type, Undo2, Upload, WandSparkles } from "lucide-react";
@@ -55,7 +56,7 @@ export default function Home() {
   const [title, setTitle] = useState("Untitled worksheet");
   const [savedSnapshot, setSavedSnapshot] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [tool, setTool] = useState<StudioTool>("select");
+  const [tool, setTool] = useState<StudioTool>("brush");
   const [brushColor, setBrushColor] = useState("#4263eb");
   const [brushSize, setBrushSize] = useState(12);
   const [brushOpacity, setBrushOpacity] = useState(1);
@@ -63,6 +64,7 @@ export default function Home() {
   const [smoothingStrength, setSmoothingStrength] = useState(0.9);
   const [stabilizerStrength, setStabilizerStrength] = useState(0.3);
   const [rightPane, setRightPane] = useState<"properties" | "layers" | "assets">("properties");
+  const [panelVisible, setPanelVisible] = useState(false);
   const [projectsOpen, setProjectsOpen] = useState(false);
   const [generatorOpen, setGeneratorOpen] = useState(false);
   const [clipartOpen, setClipartOpen] = useState(false);
@@ -126,7 +128,7 @@ export default function Home() {
   }
 
   function startFresh() {
-    setProjectId(null); setTitle("Untitled worksheet"); setCanvas(createEmptyCanvas()); setSavedSnapshot(null); setSelectedId(null); setTool("select"); setProjectsOpen(false);
+    setProjectId(null); setTitle("Untitled worksheet"); setCanvas(createEmptyCanvas()); setSavedSnapshot(null); setSelectedId(null); setTool("brush"); setProjectsOpen(false);
   }
 
   function saveProject() {
@@ -221,7 +223,7 @@ export default function Home() {
     checkpointCanvas();
     setCanvas((current) => clearCanvasLayers(current));
     setSelectedId(null);
-    setTool("select");
+    setTool("brush");
     setClearCanvasOpen(false);
     toast.success("Canvas cleared. Use Undo to restore your elements.");
   }
@@ -246,7 +248,7 @@ export default function Home() {
   if (!user) return <Welcome onLogin={() => startLogin()} />;
 
   return <div className="studio-shell">
-    <aside className="studio-sidebar">
+    <aside className="studio-sidebar art-gallery-sidebar">
       <div className="brand"><div className="brand-mark"><Palette size={18}/></div><span>Paperloom</span></div>
       <div className="workspace-switcher"><span className="workspace-avatar">{user.name?.slice(0, 1).toUpperCase() || "P"}</span><div><strong>{user.name?.split(" ")[0] || "Personal"}</strong><small>Creative workspace</small></div><ChevronRight size={16}/></div>
       <nav className="side-nav">
@@ -257,46 +259,38 @@ export default function Home() {
       <div className="sidebar-bottom"><button className="side-nav-item" onClick={() => setPenSetupOpen(true)}><CircleHelp size={18}/><span>Pen display setup</span></button><button className="side-nav-item" onClick={logout}><LogOut size={18}/><span>Sign out</span></button></div>
     </aside>
 
-    <main className="studio-main">
-      <header className="topbar">
-        <div className="crumb"><button onClick={() => setProjectsOpen(true)}>My worksheets</button><ChevronRight size={15}/><Input value={title} onChange={(event) => setTitle(event.target.value)} className="title-input" aria-label="Worksheet title" /></div>
-        <div className="topbar-actions"><span className={`save-note ${isDirty ? "is-dirty" : ""}`}>{updateProject.isPending || createProject.isPending ? <Loader2 size={14} className="animate-spin"/> : <span className="save-dot"/>}{projectId ? (isDirty ? "Unsaved changes" : "Saved workspace") : (isDirty ? "Unsaved draft" : "New draft")}</span><Button variant="outline" className="top-button" onClick={startFresh}><FilePlus2 size={16}/>New</Button><Button className="save-button" onClick={saveProject} disabled={createProject.isPending || updateProject.isPending || !canSave}>Save</Button></div>
+    <main className="studio-main art-studio-main">
+      <header className="art-topbar">
+        <button className="gallery-button" onClick={() => setProjectsOpen(true)}><Grid2X2 size={17}/><span>Gallery</span></button>
+        <div className="art-document"><span className="document-kicker">Paperloom studio</span><Input value={title} onChange={(event) => setTitle(event.target.value)} className="art-title-input" aria-label="Worksheet title" /></div>
+        <div className="art-top-actions"><span className={`art-save-note ${isDirty ? "is-dirty" : ""}`}>{updateProject.isPending || createProject.isPending ? <Loader2 size={14} className="animate-spin"/> : <span className="save-dot"/>}{projectId ? (isDirty ? "Unsaved" : "Saved") : "Draft"}</span><Tooltip><TooltipTrigger asChild><button className={`art-icon-button ${panelVisible && rightPane === "assets" ? "is-active" : ""}`} onClick={() => { setPanelVisible(rightPane === "assets" ? !panelVisible : true); setRightPane("assets"); }} aria-label="Open asset library"><ImagePlus size={18}/></button></TooltipTrigger><TooltipContent>Insert artwork</TooltipContent></Tooltip><Tooltip><TooltipTrigger asChild><button className={`art-icon-button ${panelVisible && rightPane === "layers" ? "is-active" : ""}`} onClick={() => { setPanelVisible(rightPane === "layers" ? !panelVisible : true); setRightPane("layers"); }} aria-label="Open layers"><Layers3 size={18}/></button></TooltipTrigger><TooltipContent>Layers</TooltipContent></Tooltip><label className="art-color-disc" style={{ background: brushColor }} title="Brush color"><input type="color" value={brushColor} onChange={(event) => { setBrushColor(event.target.value); setBrushOpacity(1); }} aria-label="Brush color" /></label><Button variant="outline" className="art-new-button" onClick={startFresh}><FilePlus2 size={15}/><span>New</span></Button><Button className="art-save-button" onClick={saveProject} disabled={createProject.isPending || updateProject.isPending || !canSave}>Save</Button></div>
       </header>
       {workspaceError ? <div className="workspace-error" role="alert"><span>We could not refresh part of your workspace. Your current canvas is still open.</span><button onClick={() => { refetchProjects(); refetchAssets(); }}>Try again</button></div> : null}
 
-      <section className="editor-toolbar">
-        <div className="tool-group"><ToolButton active={tool === "select"} label="Select and move" onClick={() => setTool("select")}><MousePointer2 size={17}/></ToolButton><ToolButton active={tool === "brush"} label="Freehand brush" onClick={() => setTool("brush")}><Brush size={17}/></ToolButton><ToolButton active={tool === "eraser"} label="Transparent eraser" onClick={() => setTool("eraser")}><Eraser size={17}/></ToolButton></div>
-        <div className="toolbar-divider"/>
-        <div className="tool-group shape-tools"><ToolButton label="Add rectangle" onClick={() => addDrawingElement("rectangle")}><Square size={16}/></ToolButton><ToolButton label="Add ellipse" onClick={() => addDrawingElement("ellipse")}><Circle className="ellipse-icon" size={16}/></ToolButton><ToolButton label="Add triangle" onClick={() => addDrawingElement("triangle")}><Triangle size={16}/></ToolButton><ToolButton label="Add diamond" onClick={() => addDrawingElement("diamond")}><Diamond size={16}/></ToolButton><ToolButton label="Add star" onClick={() => addDrawingElement("star")}><Star size={16}/></ToolButton><ToolButton label="Add line" onClick={() => addDrawingElement("line")}><Minus size={17}/></ToolButton><ToolButton label="Add arrow" onClick={() => addDrawingElement("arrow")}><ArrowRight size={17}/></ToolButton><ToolButton label="Add text" onClick={() => addDrawingElement("text")}><Type size={17}/></ToolButton><ToolButton active={tool === "bucket"} label="Bucket fill selected shape" onClick={() => addDrawingElement("bucket")}><PaintBucket size={16}/></ToolButton><ToolButton active={tool === "eyedropper"} label="Eyedropper: sample a canvas color" onClick={() => addDrawingElement("eyedropper")}><Pipette size={16}/></ToolButton></div>
-        <div className="toolbar-divider"/>
-        <div className="tool-group brush-preset-group" role="group" aria-label="Brush presets">{brushPresets.map((preset) => <button key={preset.id} type="button" className={`brush-preset ${activeBrushPreset === preset.id ? "is-active" : ""}`} onClick={() => applyBrushPreset(preset.id)}><span style={{ background: preset.color, opacity: preset.opacity }}/>{preset.label}</button>)}</div>
-        <div className="toolbar-divider"/>
-        <div className="tool-group brush-controls"><label className="color-swatch" style={{ background: brushColor }}><input type="color" value={brushColor} onChange={(event) => { setBrushColor(event.target.value); setBrushOpacity(1); }} aria-label="Brush color" /></label><div className="stroke-control"><span>Stroke</span><Slider value={[brushSize]} onValueChange={(value) => setBrushSize(value[0] ?? 12)} min={2} max={60} step={1} className="w-20"/><strong>{brushSize}</strong></div><div className="stroke-control pressure-control"><span>Pressure</span><Slider value={[pressureSensitivity]} onValueChange={(value) => setPressureSensitivity(value[0] ?? 1)} min={0.45} max={1.45} step={0.05} className="w-20"/><strong>{pressureSensitivity < 0.75 ? "Soft" : pressureSensitivity > 1.2 ? "Bold" : "Balanced"}</strong></div><div className="stroke-control smoothing-control"><span>Smooth</span><Slider value={[smoothingStrength]} onValueChange={(value) => setSmoothingStrength(value[0] ?? 0.9)} min={0} max={1} step={0.05} className="w-20"/><strong>{Math.round(smoothingStrength * 100)}%</strong></div><div className="stroke-control stabilizer-control"><span>Steady</span><Slider value={[stabilizerStrength]} onValueChange={(value) => setStabilizerStrength(value[0] ?? 0.3)} min={0} max={1} step={0.05} className="w-20"/><strong>{stabilizerStrength === 0 ? "Off" : stabilizerStrength < 0.5 ? "Gentle" : "Firm"}</strong></div></div>
-        <div className="toolbar-spacer"/>
-        <button className="outline-action" onClick={() => setCanvas((current) => ({ ...current, transparentBackground: !current.transparentBackground }))}><span className={`transparency-icon ${canvas.transparentBackground ? "is-on" : ""}`}/>{canvas.transparentBackground ? "Transparent" : "White background"}</button>
-        <button className="clear-canvas-button" onClick={() => setClearCanvasOpen(true)} disabled={!canvas.layers.length}><Trash2 size={15}/>Clear canvas</button>
-        <button className={`pen-display-button ${penDetected ? "is-detected" : ""}`} onClick={() => setPenSetupOpen(true)}><PenLine size={15}/>{penDetected ? "Pen detected" : "Pen display"}</button>
-        <Button className="generate-button" onClick={() => setClipartOpen(true)}><Sparkles size={16}/>Custom clipart</Button>
-      </section>
-
-      <section className="editor-workspace">
-        <div className="canvas-column">
-          <div className="canvas-frame"><div className="canvas-ruler top-ruler"/><div className="canvas-ruler side-ruler"/><div className="canvas-history-controls" role="group" aria-label="Canvas history"><Tooltip><TooltipTrigger asChild><button onClick={undoCanvas} disabled={!historyAvailability.canUndo} aria-label="Undo last canvas edit"><Undo2 size={16}/></button></TooltipTrigger><TooltipContent>Undo canvas edit</TooltipContent></Tooltip><Tooltip><TooltipTrigger asChild><button onClick={redoCanvas} disabled={!historyAvailability.canRedo} aria-label="Redo canvas edit"><Redo2 size={16}/></button></TooltipTrigger><TooltipContent>Redo canvas edit</TooltipContent></Tooltip></div><WorksheetCanvas state={canvas} onChange={setCanvas} selectedId={selectedId} onSelect={setSelectedId} tool={tool} brushColor={brushColor} brushSize={brushSize} brushOpacity={brushOpacity} pressureSensitivity={pressureSensitivity} smoothingStrength={smoothingStrength} stabilizerStrength={stabilizerStrength} onPenDetected={() => setPenDetected(true)} onEditStart={checkpointCanvas} onPickColor={(color) => { setBrushColor(color); setBrushOpacity(1); toast.success("Sampled color is now your brush color."); }}/></div>
-          <div className="canvas-footer"><span>Letter · 8.5 × 11 in</span><span>{canvas.transparentBackground ? "Transparent canvas" : "White canvas"}</span><span>{canvas.layers.length} {canvas.layers.length === 1 ? "element" : "elements"}</span></div>
+      <section className={`art-workspace ${panelVisible ? "has-panel" : ""}`}>
+        <aside className="art-tool-rail" aria-label="Drawing tools">
+          <div className="art-tool-cluster"><ToolButton active={tool === "select"} label="Transform and move" onClick={() => setTool("select")}><MousePointer2 size={19}/></ToolButton><ToolButton active={tool === "brush"} label="Freehand brush" onClick={() => setTool("brush")}><Brush size={19}/></ToolButton><ToolButton active={tool === "eraser"} label="Transparent eraser" onClick={() => setTool("eraser")}><Eraser size={19}/></ToolButton><ToolButton active={tool === "bucket"} label="Fill selected shape" onClick={() => addDrawingElement("bucket")}><PaintBucket size={18}/></ToolButton><ToolButton active={tool === "eyedropper"} label="Sample canvas color" onClick={() => addDrawingElement("eyedropper")}><Pipette size={18}/></ToolButton></div>
+          <span className="art-rail-rule"/>
+          <div className="art-tool-cluster art-shape-cluster"><ToolButton label="Rectangle" onClick={() => addDrawingElement("rectangle")}><Square size={17}/></ToolButton><ToolButton label="Ellipse" onClick={() => addDrawingElement("ellipse")}><Circle size={17}/></ToolButton><ToolButton label="Triangle" onClick={() => addDrawingElement("triangle")}><Triangle size={17}/></ToolButton><ToolButton label="Diamond" onClick={() => addDrawingElement("diamond")}><Diamond size={17}/></ToolButton><ToolButton label="Star" onClick={() => addDrawingElement("star")}><Star size={17}/></ToolButton><ToolButton label="Line" onClick={() => addDrawingElement("line")}><Minus size={18}/></ToolButton><ToolButton label="Arrow" onClick={() => addDrawingElement("arrow")}><ArrowRight size={18}/></ToolButton><ToolButton label="Text" onClick={() => addDrawingElement("text")}><Type size={18}/></ToolButton></div>
+          <div className="art-rail-bottom"><Tooltip><TooltipTrigger asChild><button className="art-rail-action" onClick={() => setCanvas((current) => ({ ...current, transparentBackground: !current.transparentBackground }))} aria-label="Toggle canvas background"><span className={`transparency-icon ${canvas.transparentBackground ? "is-on" : ""}`}/></button></TooltipTrigger><TooltipContent>{canvas.transparentBackground ? "Transparent background" : "White background"}</TooltipContent></Tooltip><Tooltip><TooltipTrigger asChild><button className={`art-rail-action ${penDetected ? "is-detected" : ""}`} onClick={() => setPenSetupOpen(true)} aria-label="Pen display setup"><PenLine size={18}/></button></TooltipTrigger><TooltipContent>{penDetected ? "Pen detected" : "Pen display setup"}</TooltipContent></Tooltip></div>
+        </aside>
+        <div className="art-canvas-zone">
+          <div className="art-canvas-heading"><div><span>Artwork</span><strong>{activeBrushPreset ? brushPresets.find((preset) => preset.id === activeBrushPreset)?.label : "Custom brush"}</strong></div><small>Pinch or two-finger drag to navigate</small></div>
+          <div className="art-canvas-frame"><div className="canvas-history-controls" role="group" aria-label="Canvas history"><Tooltip><TooltipTrigger asChild><button onClick={undoCanvas} disabled={!historyAvailability.canUndo} aria-label="Undo last canvas edit"><Undo2 size={16}/></button></TooltipTrigger><TooltipContent>Undo canvas edit</TooltipContent></Tooltip><Tooltip><TooltipTrigger asChild><button onClick={redoCanvas} disabled={!historyAvailability.canRedo} aria-label="Redo last canvas edit"><Redo2 size={16}/></button></TooltipTrigger><TooltipContent>Redo canvas edit</TooltipContent></Tooltip></div><WorksheetCanvas state={canvas} onChange={setCanvas} selectedId={selectedId} onSelect={(id) => { setSelectedId(id); if (id) { setRightPane("properties"); setPanelVisible(true); } }} tool={tool} brushColor={brushColor} brushSize={brushSize} brushOpacity={brushOpacity} pressureSensitivity={pressureSensitivity} smoothingStrength={smoothingStrength} stabilizerStrength={stabilizerStrength} onPenDetected={() => setPenDetected(true)} onEditStart={checkpointCanvas} onPickColor={(color) => { setBrushColor(color); setBrushOpacity(1); toast.success("Sampled color is now your brush color."); }}/></div>
+          <div className="art-canvas-meta"><span>Letter • 8.5 × 11 in</span><span>{canvas.layers.length} {canvas.layers.length === 1 ? "layer" : "layers"}</span><span>{canvas.transparentBackground ? "Transparency on" : "White paper"}</span></div>
         </div>
-
-        <aside className="inspector">
+        {panelVisible ? <aside className="art-panel">
           <Tabs value={rightPane} onValueChange={(value) => setRightPane(value as typeof rightPane)}>
-            <TabsList className="inspector-tabs"><TabsTrigger value="properties">Properties</TabsTrigger><TabsTrigger value="layers">Layers</TabsTrigger><TabsTrigger value="assets">Library</TabsTrigger></TabsList>
+            <TabsList className="art-panel-tabs"><TabsTrigger value="properties">Adjust</TabsTrigger><TabsTrigger value="layers">Layers</TabsTrigger><TabsTrigger value="assets">Insert</TabsTrigger></TabsList>
           </Tabs>
           {rightPane === "properties" && <PropertiesPanel selected={selectedLayer} onChange={updateSelected} onRemove={removeSelected} onDuplicate={duplicateSelected} onForward={() => selectedId && moveLayer(selectedId, "forward")} onBack={() => selectedId && moveLayer(selectedId, "back")} />}
           {rightPane === "layers" && <LayersPanel layers={canvas.layers} selectedId={selectedId} onSelect={setSelectedId} onForward={moveLayer} onBack={moveLayer} />}
           {rightPane === "assets" && <AssetLibrary assets={assets} loading={assetsLoading} onAdd={addAssetToCanvas} onUpload={() => fileRef.current?.click()} onGenerate={() => setGeneratorOpen(true)} onRemove={(assetId) => deleteAsset.mutate({ assetId })}/>} 
           <input ref={fileRef} type="file" accept="image/*" className="sr-only" onChange={uploadAsset}/>
-        </aside>
+        </aside> : null}
       </section>
 
-      <footer className="export-bar"><div className="export-copy"><ArrowDownToLine size={18}/><div><strong>Ready to share</strong><span>Export your worksheet in a classroom-ready format.</span></div></div><div className="export-actions"><Button variant="outline" onClick={() => exportWorksheet("svg")} disabled={Boolean(exporting)}>{exporting === "svg" ? <Loader2 className="animate-spin"/> : null}SVG</Button><Button variant="outline" onClick={() => exportWorksheet("png")} disabled={Boolean(exporting)}>{exporting === "png" ? <Loader2 className="animate-spin"/> : null}PNG</Button><Button onClick={() => exportWorksheet("pdf")} disabled={Boolean(exporting)}>{exporting === "pdf" ? <Loader2 className="animate-spin"/> : null}Export PDF</Button></div></footer>
+      <footer className="art-brush-dock"><div className="brush-library-heading"><span>Brush library</span><strong>{activeBrushPreset ? brushPresets.find((preset) => preset.id === activeBrushPreset)?.label : "Custom brush"}</strong></div><div className="art-preset-grid" role="group" aria-label="Brush presets">{brushPresets.map((preset) => <button key={preset.id} type="button" className={`art-preset-card ${activeBrushPreset === preset.id ? "is-active" : ""}`} onClick={() => applyBrushPreset(preset.id)}><span className="art-preset-mark" style={{ background: preset.color, opacity: preset.opacity }}/><span><strong>{preset.label}</strong><small>{preset.id === "pencil" ? "Natural line" : preset.id === "marker" ? "Solid ink" : "Transparent ink"}</small></span></button>)}</div><div className="art-brush-tuning"><div className="art-tune-control"><span>Size</span><Slider value={[brushSize]} onValueChange={(value) => setBrushSize(value[0] ?? 12)} min={2} max={60} step={1}/><strong>{brushSize}</strong></div><div className="art-tune-control"><span>Opacity</span><Slider value={[brushOpacity * 100]} onValueChange={(value) => setBrushOpacity((value[0] ?? 100) / 100)} min={5} max={100} step={1}/><strong>{Math.round(brushOpacity * 100)}%</strong></div><div className="art-tune-control pro-precision-control"><span>Smooth</span><Slider value={[smoothingStrength]} onValueChange={(value) => setSmoothingStrength(value[0] ?? 0.9)} min={0} max={1} step={0.05}/><strong>{Math.round(smoothingStrength * 100)}%</strong></div><div className="art-tune-control pro-precision-control"><span>Steady</span><Slider value={[stabilizerStrength]} onValueChange={(value) => setStabilizerStrength(value[0] ?? 0.3)} min={0} max={1} step={0.05}/><strong>{stabilizerStrength === 0 ? "Off" : "On"}</strong></div></div><div className="art-dock-actions"><Button variant="outline" onClick={() => setClipartOpen(true)}><Sparkles size={14}/>AI artwork</Button><button className="art-clear-button" onClick={() => setClearCanvasOpen(true)} disabled={!canvas.layers.length}><Trash2 size={14}/>Clear</button><div className="art-export-group"><button onClick={() => exportWorksheet("svg")} disabled={Boolean(exporting)}>SVG</button><button onClick={() => exportWorksheet("png")} disabled={Boolean(exporting)}>PNG</button><button onClick={() => exportWorksheet("pdf")} disabled={Boolean(exporting)}>{exporting === "pdf" ? <Loader2 className="animate-spin"/> : <ArrowDownToLine size={14}/>}Export</button></div></div></footer>
     </main>
     <ProjectDialog open={projectsOpen} projects={projects} activeId={projectId} onOpenChange={setProjectsOpen} onCreate={startFresh} onOpen={openProject} onRemove={(id) => { removeProject.mutate({ projectId: id }); if (id === projectId) startFresh(); }} />
     <GenerateDialog open={generatorOpen} onOpenChange={setGeneratorOpen} loading={generateAsset.isPending} onGenerate={(input) => { generateAsset.mutate(input); setGeneratorOpen(false); }}/>
