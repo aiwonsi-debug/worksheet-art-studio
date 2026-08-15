@@ -102,3 +102,7 @@
 - [x] Verify PDF page rendering in a real browser with the production import engine and verify that background insertion keeps annotations above the locked page in the exported canvas state.
 - [x] Verify imported PDF backgrounds persist through saved worksheet state and remain behind annotations in PNG/PDF/SVG output.
 - [x] Save the fully verified PDF annotation workflow as a new delivery checkpoint.
+- [x] Add a clear, high-contrast worksheet border and depth treatment so the drawing area remains visible when zoomed out.
+- [x] Verify the desktop worksheet-boundary treatment and its regression safety.
+- [x] Verify worksheet-boundary visibility at a tablet viewport.
+- [ ] Save the verified worksheet-boundary update as a delivery checkpoint.
