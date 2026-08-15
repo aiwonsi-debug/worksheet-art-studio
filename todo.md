@@ -25,3 +25,12 @@
 - [x] Add automated tests for stylus input normalization and pressure-aware stroke behavior.
 - [x] Verify the pen-display-ready editor and save a delivery checkpoint.
 - [x] Save the verified VEIKK VK1200 V2 compatibility delivery checkpoint.
+- [x] Add a dedicated text-to-image custom clipart action in the editor toolbar.
+- [x] Generate transparent custom clipart from a text prompt, insert it on the active worksheet, and persist it to the user’s asset library.
+- [x] Add automated coverage for clipart-specific prompt preparation and direct insertion behavior.
+- [x] Visually verify the direct clipart workflow and save a delivery checkpoint.
+- [x] Render pressure input as variable-width strokes rather than a single-width path.
+- [x] Add a VEIKK VK1200 V2 shortcut-mapping reference for Brush, Eraser, Undo, Redo, Save, and Export.
+- [x] Document the user-performed VK1200 V2 hardware and browser validation steps, including the physical driver mapping limitation.
+- [x] Save the direct clipart and VEIKK workflow delivery checkpoint.
+- [x] Add a regression test confirming generated clipart is inserted and selected on the active canvas.

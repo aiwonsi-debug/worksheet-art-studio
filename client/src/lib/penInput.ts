@@ -35,3 +35,7 @@ export function pressureAdjustedStroke(baseSize: number, pressure: number, isPen
   const response = 0.28 + pressure * 0.72;
   return Math.round(Math.max(1.5, baseSize * response) * 10) / 10;
 }
+
+export function createStrokePoint(x: number, y: number, baseSize: number, pressure: number, isPen: boolean) {
+  return { x, y, size: pressureAdjustedStroke(baseSize, pressure, isPen) };
+}

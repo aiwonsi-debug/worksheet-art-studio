@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pressureAdjustedStroke, resolveStylusInput } from "./penInput";
+import { createStrokePoint, pressureAdjustedStroke, resolveStylusInput } from "./penInput";
 
 describe("stylus input normalization", () => {
   it("uses pen pressure while retaining a stable default for drivers that report zero on pointer down", () => {
@@ -15,5 +15,11 @@ describe("stylus input normalization", () => {
   it("keeps mouse fallback strokes at the selected brush size", () => {
     expect(resolveStylusInput({ pointerType: "mouse" }).pressure).toBe(1);
     expect(pressureAdjustedStroke(14, 0.2, false)).toBe(14);
+  });
+
+  it("preserves distinct pressure-derived widths for sampled stylus points", () => {
+    const light = createStrokePoint(10, 10, 20, 0.2, true);
+    const firm = createStrokePoint(20, 20, 20, 0.9, true);
+    expect(firm.size).toBeGreaterThan(light.size);
   });
 });

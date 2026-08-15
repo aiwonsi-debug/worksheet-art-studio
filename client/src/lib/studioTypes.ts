@@ -28,6 +28,13 @@ export type PathLayer = {
   height: number;
   rotation: number;
   opacity: number;
+  points?: StrokePoint[];
+};
+
+export type StrokePoint = {
+  x: number;
+  y: number;
+  size: number;
 };
 
 export type StudioLayer = ImageLayer | PathLayer;

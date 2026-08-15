@@ -1,9 +1,9 @@
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { useRef, useState } from "react";
 import { nanoid } from "nanoid";
-import type { StudioLayer, StudioTool, WorksheetCanvasState } from "@/lib/studioTypes";
+import type { PathLayer, StudioLayer, StudioTool, WorksheetCanvasState } from "@/lib/studioTypes";
 import { WORKSHEET_HEIGHT, WORKSHEET_WIDTH } from "@/lib/studioTypes";
-import { pressureAdjustedStroke, resolveStylusInput } from "@/lib/penInput";
+import { createStrokePoint, pressureAdjustedStroke, resolveStylusInput } from "@/lib/penInput";
 
 type PointerSession = { kind: "draw"; id: string; pointerId: number; baseSize: number; isPen: boolean } | { kind: "move"; id: string; pointerId: number; originX: number; originY: number; layerX: number; layerY: number; isPen: boolean } | null;
 
@@ -16,9 +16,18 @@ type Props = {
   brushColor: string;
   brushSize: number;
   onPenDetected?: () => void;
+  onEditStart?: () => void;
 };
 
-export default function WorksheetCanvas({ state, onChange, selectedId, onSelect, tool, brushColor, brushSize, onPenDetected }: Props) {
+function VariableStroke({ layer }: { layer: PathLayer }) {
+  const points = layer.points;
+  const style = { mixBlendMode: layer.mode === "erase" ? ("destination-out" as any) : "normal" };
+  if (!points?.length) return <path d={layer.d} fill="none" stroke={layer.mode === "erase" ? "#000" : layer.color} strokeWidth={layer.strokeWidth} strokeLinecap="round" strokeLinejoin="round" opacity={layer.opacity} style={style} />;
+  if (points.length === 1) return <circle cx={points[0].x} cy={points[0].y} r={points[0].size / 2} fill={layer.mode === "erase" ? "#000" : layer.color} opacity={layer.opacity} style={style} />;
+  return <g opacity={layer.opacity} style={style}>{points.slice(1).map((point, index) => { const previous = points[index]; return <path key={`${point.x}-${point.y}-${index}`} d={`M ${previous.x} ${previous.y} L ${point.x} ${point.y}`} fill="none" stroke={layer.mode === "erase" ? "#000" : layer.color} strokeWidth={point.size} strokeLinecap="round" strokeLinejoin="round" />; })}</g>;
+}
+
+export default function WorksheetCanvas({ state, onChange, selectedId, onSelect, tool, brushColor, brushSize, onPenDetected, onEditStart }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
   const pointerRef = useRef<PointerSession>(null);
   const activePenPointerId = useRef<number | null>(null);
@@ -57,7 +66,8 @@ export default function WorksheetCanvas({ state, onChange, selectedId, onSelect,
     }
     const id = nanoid();
     const strokeWidth = pressureAdjustedStroke(brushSize, stylus.pressure, stylus.isPen);
-    const layer: StudioLayer = { id, type: "path", name: activeTool === "eraser" ? "Transparent erase" : stylus.isPen ? "Pressure brush stroke" : "Freehand stroke", d: `M ${current.x} ${current.y}`, color: brushColor, strokeWidth, mode: activeTool === "eraser" ? "erase" : "draw", x: 0, y: 0, width: 0, height: 0, rotation: 0, opacity: 1 };
+    const layer: StudioLayer = { id, type: "path", name: activeTool === "eraser" ? "Transparent erase" : stylus.isPen ? "Pressure brush stroke" : "Freehand stroke", d: `M ${current.x} ${current.y}`, color: brushColor, strokeWidth, mode: activeTool === "eraser" ? "erase" : "draw", x: 0, y: 0, width: 0, height: 0, rotation: 0, opacity: 1, points: [createStrokePoint(current.x, current.y, brushSize, stylus.pressure, stylus.isPen)] };
+    onEditStart?.();
     onChange({ ...state, layers: [...state.layers, layer] });
     onSelect(id);
     pointerRef.current = { kind: "draw", id, pointerId: event.pointerId, baseSize: brushSize, isPen: stylus.isPen };
@@ -72,7 +82,7 @@ export default function WorksheetCanvas({ state, onChange, selectedId, onSelect,
     if (stylus.shouldIgnore || (session.isPen && !stylus.isPen)) return;
     const current = point(event);
     if (session.kind === "draw") {
-      updateLayer(session.id, (layer) => layer.type === "path" ? { ...layer, d: `${layer.d} L ${current.x} ${current.y}`, strokeWidth: pressureAdjustedStroke(session.baseSize, stylus.pressure, session.isPen) } : layer);
+      updateLayer(session.id, (layer) => layer.type === "path" ? { ...layer, d: `${layer.d} L ${current.x} ${current.y}`, strokeWidth: pressureAdjustedStroke(session.baseSize, stylus.pressure, session.isPen), points: [...(layer.points ?? []), createStrokePoint(current.x, current.y, session.baseSize, stylus.pressure, session.isPen)] } : layer);
       return;
     }
     updateLayer(session.id, (layer) => ({ ...layer, x: Math.max(-layer.width / 2, Math.min(WORKSHEET_WIDTH - layer.width / 2, session.layerX + current.x - session.originX)), y: Math.max(-layer.height / 2, Math.min(WORKSHEET_HEIGHT - layer.height / 2, session.layerY + current.y - session.originY)) }));
@@ -97,7 +107,7 @@ export default function WorksheetCanvas({ state, onChange, selectedId, onSelect,
             const active = layer.id === selectedId;
             const transform = `rotate(${layer.rotation} ${layer.x + layer.width / 2} ${layer.y + layer.height / 2})`;
             return <g key={layer.id} data-layer-id={layer.id} transform={layer.type === "image" ? transform : undefined} className={`canvas-layer ${active ? "is-selected" : ""}`}>
-              {layer.type === "image" ? <image href={layer.src} x={layer.x} y={layer.y} width={layer.width} height={layer.height} opacity={layer.opacity} preserveAspectRatio="none" /> : <path d={layer.d} fill="none" stroke={layer.mode === "erase" ? "#000" : layer.color} strokeWidth={layer.strokeWidth} strokeLinecap="round" strokeLinejoin="round" opacity={layer.opacity} style={{ mixBlendMode: layer.mode === "erase" ? ("destination-out" as any) : "normal" }} />}
+              {layer.type === "image" ? <image href={layer.src} x={layer.x} y={layer.y} width={layer.width} height={layer.height} opacity={layer.opacity} preserveAspectRatio="none" /> : <VariableStroke layer={layer} />}
               {active && layer.type === "image" ? <rect className="selection-box" x={layer.x} y={layer.y} width={layer.width} height={layer.height} fill="none" transform={transform} /> : null}
             </g>;
           })}

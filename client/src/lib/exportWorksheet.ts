@@ -9,7 +9,10 @@ function renderLayer(layer: StudioLayer, imageSources: Map<string, string>) {
   if (layer.type === "image") {
     return `<image href="${escape(imageSources.get(layer.src) ?? layer.src)}" x="${layer.x}" y="${layer.y}" width="${layer.width}" height="${layer.height}" opacity="${layer.opacity}" preserveAspectRatio="none" transform="${transform}" />`;
   }
-  return `<path d="${escape(layer.d)}" fill="none" stroke="${layer.mode === "erase" ? "#000" : layer.color}" stroke-width="${layer.strokeWidth}" stroke-linecap="round" stroke-linejoin="round" opacity="${layer.opacity}" style="mix-blend-mode:${layer.mode === "erase" ? "destination-out" : "normal"}" />`;
+  const style = `mix-blend-mode:${layer.mode === "erase" ? "destination-out" : "normal"}`;
+  if (layer.points?.length === 1) { const point = layer.points[0]; return `<circle cx="${point.x}" cy="${point.y}" r="${point.size / 2}" fill="${layer.mode === "erase" ? "#000" : layer.color}" opacity="${layer.opacity}" style="${style}" />`; }
+  if (layer.points && layer.points.length > 1) return `<g opacity="${layer.opacity}" style="${style}">${layer.points.slice(1).map((point, index) => { const previous = layer.points![index]; return `<path d="M ${previous.x} ${previous.y} L ${point.x} ${point.y}" fill="none" stroke="${layer.mode === "erase" ? "#000" : layer.color}" stroke-width="${point.size}" stroke-linecap="round" stroke-linejoin="round" />`; }).join("")}</g>`;
+  return `<path d="${escape(layer.d)}" fill="none" stroke="${layer.mode === "erase" ? "#000" : layer.color}" stroke-width="${layer.strokeWidth}" stroke-linecap="round" stroke-linejoin="round" opacity="${layer.opacity}" style="${style}" />`;
 }
 
 export function renderWorksheetSvg(state: WorksheetCanvasState, imageSources = new Map<string, string>()) {

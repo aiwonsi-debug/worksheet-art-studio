@@ -12,6 +12,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { trpc } from "@/lib/trpc";
 import { createEmptyCanvas, type AssetKind, type StudioLayer, type StudioTool, type WorksheetCanvasState } from "@/lib/studioTypes";
 import { downloadWorksheet } from "@/lib/exportWorksheet";
+import { prepareCustomClipartPrompt } from "@/lib/clipartPrompt";
+import { resolveStudioShortcut } from "@/lib/studioShortcuts";
+import { insertAssetOnCanvas } from "@/lib/assetInsertion";
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
 import { Archive, ArrowDownToLine, Brush, ChevronRight, CircleHelp, Eraser, FilePlus2, FolderOpen, Grid2X2, ImagePlus, Layers3, Loader2, LogOut, MoreHorizontal, MousePointer2, Palette, PanelLeftClose, PenLine, Plus, RotateCcw, Sparkles, Trash2, Upload, WandSparkles } from "lucide-react";
@@ -51,8 +54,11 @@ export default function Home() {
   const [rightPane, setRightPane] = useState<"properties" | "layers" | "assets">("properties");
   const [projectsOpen, setProjectsOpen] = useState(false);
   const [generatorOpen, setGeneratorOpen] = useState(false);
+  const [clipartOpen, setClipartOpen] = useState(false);
   const [penSetupOpen, setPenSetupOpen] = useState(false);
   const [penDetected, setPenDetected] = useState(false);
+  const [canvasHistory, setCanvasHistory] = useState<WorksheetCanvasState[]>([]);
+  const [canvasFuture, setCanvasFuture] = useState<WorksheetCanvasState[]>([]);
   const [exporting, setExporting] = useState<"png" | "svg" | "pdf" | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const selectedLayer = useMemo(() => canvas.layers.find((layer) => layer.id === selectedId) ?? null, [canvas.layers, selectedId]);
@@ -72,6 +78,24 @@ export default function Home() {
     if (projects.length && projectId === null) openProject(projects[0]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projects.length]);
+
+  useEffect(() => {
+    const handleShortcut = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target?.matches("input, textarea, select") || target?.isContentEditable) return;
+      const command = resolveStudioShortcut(event);
+      if (!command) return;
+      event.preventDefault();
+      if (command === "brush") setTool("brush");
+      if (command === "eraser") setTool("eraser");
+      if (command === "undo") undoCanvas();
+      if (command === "redo") redoCanvas();
+      if (command === "save") saveProject();
+      if (command === "export") exportWorksheet("pdf");
+    };
+    window.addEventListener("keydown", handleShortcut);
+    return () => window.removeEventListener("keydown", handleShortcut);
+  }, [canvas, canvasFuture, canvasHistory, projectId, title]);
 
   function openProject(project: { id: number; title: string; canvasData: string }) {
     setProjectId(project.id);
@@ -93,14 +117,36 @@ export default function Home() {
     else createProject.mutate({ title, canvasData });
   }
 
+  function checkpointCanvas() {
+    setCanvasHistory((current) => [...current.slice(-29), canvas]);
+    setCanvasFuture([]);
+  }
+
+  function undoCanvas() {
+    const previous = canvasHistory.at(-1);
+    if (!previous) return;
+    setCanvasHistory((current) => current.slice(0, -1));
+    setCanvasFuture((current) => [canvas, ...current].slice(0, 30));
+    setCanvas(previous);
+    setSelectedId(null);
+    toast.message("Undid the last canvas edit.");
+  }
+
+  function redoCanvas() {
+    const next = canvasFuture[0];
+    if (!next) return;
+    setCanvasFuture((current) => current.slice(1));
+    setCanvasHistory((current) => [...current.slice(-29), canvas]);
+    setCanvas(next);
+    setSelectedId(null);
+    toast.message("Redid the canvas edit.");
+  }
+
   function addAssetToCanvas(asset: { id: number; name: string; url: string; kind: string }) {
-    const isBorder = asset.kind === "border";
-    const isHeader = asset.kind === "header";
-    const width = isBorder ? 830 : isHeader ? 650 : 250;
-    const height = isBorder ? 1040 : isHeader ? 210 : 250;
-    const layer: StudioLayer = { id: nanoid(), type: "image", name: asset.name, src: asset.url, x: (920 - width) / 2, y: isHeader ? 66 : (1160 - height) / 2, width, height, rotation: 0, opacity: 1 };
-    setCanvas((current) => ({ ...current, layers: [...current.layers, layer] }));
-    setSelectedId(layer.id);
+    const insertion = insertAssetOnCanvas(canvas, asset, nanoid());
+    checkpointCanvas();
+    setCanvas(insertion.canvas);
+    setSelectedId(insertion.selectedId);
     setTool("select");
     setRightPane("properties");
   }
@@ -172,12 +218,12 @@ export default function Home() {
         <div className="toolbar-spacer"/>
         <button className="outline-action" onClick={() => setCanvas((current) => ({ ...current, transparentBackground: !current.transparentBackground }))}><span className={`transparency-icon ${canvas.transparentBackground ? "is-on" : ""}`}/>{canvas.transparentBackground ? "Transparent" : "White background"}</button>
         <button className={`pen-display-button ${penDetected ? "is-detected" : ""}`} onClick={() => setPenSetupOpen(true)}><PenLine size={15}/>{penDetected ? "Pen detected" : "Pen display"}</button>
-        <Button className="generate-button" onClick={() => setGeneratorOpen(true)}><Sparkles size={16}/>Create asset</Button>
+        <Button className="generate-button" onClick={() => setClipartOpen(true)}><Sparkles size={16}/>Custom clipart</Button>
       </section>
 
       <section className="editor-workspace">
         <div className="canvas-column">
-          <div className="canvas-frame"><div className="canvas-ruler top-ruler"/><div className="canvas-ruler side-ruler"/><WorksheetCanvas state={canvas} onChange={setCanvas} selectedId={selectedId} onSelect={setSelectedId} tool={tool} brushColor={brushColor} brushSize={brushSize} onPenDetected={() => setPenDetected(true)}/></div>
+          <div className="canvas-frame"><div className="canvas-ruler top-ruler"/><div className="canvas-ruler side-ruler"/><WorksheetCanvas state={canvas} onChange={setCanvas} selectedId={selectedId} onSelect={setSelectedId} tool={tool} brushColor={brushColor} brushSize={brushSize} onPenDetected={() => setPenDetected(true)} onEditStart={checkpointCanvas}/></div>
           <div className="canvas-footer"><span>Letter · 8.5 × 11 in</span><span>{canvas.transparentBackground ? "Transparent canvas" : "White canvas"}</span><span>{canvas.layers.length} {canvas.layers.length === 1 ? "element" : "elements"}</span></div>
         </div>
 
@@ -196,11 +242,14 @@ export default function Home() {
     </main>
     <ProjectDialog open={projectsOpen} projects={projects} activeId={projectId} onOpenChange={setProjectsOpen} onCreate={startFresh} onOpen={openProject} onRemove={(id) => { removeProject.mutate({ projectId: id }); if (id === projectId) startFresh(); }} />
     <GenerateDialog open={generatorOpen} onOpenChange={setGeneratorOpen} loading={generateAsset.isPending} onGenerate={(input) => { generateAsset.mutate(input); setGeneratorOpen(false); }}/>
+    <QuickClipartDialog open={clipartOpen} onOpenChange={setClipartOpen} loading={generateAsset.isPending} onGenerate={(prompt) => { try { const cleanPrompt = prepareCustomClipartPrompt(prompt); generateAsset.mutate({ kind: "clipart", name: cleanPrompt, prompt: cleanPrompt, style: "Clean hand-drawn worksheet clipart" }); setClipartOpen(false); } catch (error) { toast.error(error instanceof Error ? error.message : "Describe the clipart first."); } }}/>
     <PenDisplayDialog open={penSetupOpen} onOpenChange={setPenSetupOpen} detected={penDetected}/>
   </div>;
 }
 
 function Welcome({ onLogin }: { onLogin: () => void }) { return <div className="welcome-shell"><div className="welcome-art"><div className="floating-card card-one"><Sparkles size={18}/></div><div className="floating-card card-two"><Palette size={20}/></div><div className="paper-preview"><span className="preview-sun"/><span className="preview-line long"/><span className="preview-line"/><span className="preview-line short"/><span className="preview-sticker">A+</span></div></div><div className="welcome-copy"><div className="eyebrow"><Sparkles size={14}/>AI worksheet studio</div><h1>Make every worksheet<br/><i>feel considered.</i></h1><p>Generate original clipart, paint directly on a layered canvas, and keep every element ready for the next brilliant lesson.</p><Button size="lg" onClick={onLogin}>Enter your studio <ChevronRight size={17}/></Button><small>Your projects and asset history stay private to your workspace.</small></div></div>; }
+
+function QuickClipartDialog({ open, onOpenChange, loading, onGenerate }: { open: boolean; onOpenChange: (value: boolean) => void; loading: boolean; onGenerate: (prompt: string) => void }) { const [prompt, setPrompt] = useState(""); return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="generate-dialog quick-clipart-dialog"><DialogHeader><div className="generator-icon"><Sparkles size={19}/></div><DialogTitle>Create custom clipart</DialogTitle><p>Describe one original worksheet element. Paperloom will create it with a transparent background, add it to this canvas, and save it in your library.</p></DialogHeader><div className="generate-field"><Label htmlFor="quick-clipart-prompt">Describe your clipart</Label><Input id="quick-clipart-prompt" autoFocus placeholder="e.g. a cheerful owl holding a pencil" value={prompt} onChange={(event) => setPrompt(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") onGenerate(prompt); }} /></div><div className="transparent-note"><span className="transparency-icon is-on"/><span><strong>Direct-to-canvas</strong> Transparent clipart will be selected on your worksheet when it is ready.</span></div><Button className="generate-submit" disabled={loading || prompt.trim().length < 3} onClick={() => onGenerate(prompt)}>{loading ? <Loader2 className="animate-spin"/> : <WandSparkles size={16}/>}Generate & insert clipart</Button></DialogContent></Dialog>; }
 
 function PropertiesPanel({ selected, onChange, onRemove, onForward, onBack }: { selected: StudioLayer | null; onChange: (patch: Partial<StudioLayer>) => void; onRemove: () => void; onForward: () => void; onBack: () => void }) {
   if (!selected) return <div className="empty-inspector"><div className="empty-orb"><MousePointer2 size={22}/></div><h3>Select an element</h3><p>Choose an asset or drawing on your worksheet to adjust its scale, position, and appearance.</p></div>;
