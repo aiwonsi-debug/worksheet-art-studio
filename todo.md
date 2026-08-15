@@ -57,7 +57,7 @@
 - [x] Verify and test duplicate, keyboard deletion, and layer-order actions for selected elements.
 - [x] Add focused regression coverage for selected-element property edits and canvas actions.
 - [x] Inspect the current repository state and prepare the verified Paperloom source for GitHub.
-- [ ] Create or connect a private GitHub repository and push the current project state.
-- [ ] Verify the pushed GitHub repository and share its link.
-- [ ] Review the publishable source, stage the intended changes, and commit the current verified project state.
-- [ ] Recheck the clean repository state before pushing to GitHub.
+- [x] Create or connect a private GitHub repository and push the current project state.
+- [x] Verify the pushed GitHub repository and share its link.
+- [x] Review the publishable source, stage the intended changes, and commit the current verified project state.
+- [x] Recheck the clean repository state before pushing to GitHub.
