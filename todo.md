@@ -34,3 +34,11 @@
 - [x] Document the user-performed VK1200 V2 hardware and browser validation steps, including the physical driver mapping limitation.
 - [x] Save the direct clipart and VEIKK workflow delivery checkpoint.
 - [x] Add a regression test confirming generated clipart is inserted and selected on the active canvas.
+- [x] Add subject-based clipart prompt presets to the direct custom-clipart workflow.
+- [x] Add a pressure-curve sensitivity control that adjusts variable-width stylus response.
+- [x] Add compact undo and redo controls directly above the worksheet canvas.
+- [x] Add regression tests for preset selection, pressure-response behavior, and canvas-history control availability.
+- [x] Visually verify the refined editor controls and save a delivery checkpoint.
+- [x] Save the verified presets, pressure, and canvas-history delivery checkpoint.
+- [x] Add a regression test confirming subject-preset selection supplies the prompt used for custom clipart generation.
+- [x] Save the verified presets, pressure sensitivity, history controls, and preset-interaction test checkpoint.

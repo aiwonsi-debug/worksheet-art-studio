@@ -30,12 +30,13 @@ export function resolveStylusInput(event: StylusPointer, penAlreadyActive = fals
   };
 }
 
-export function pressureAdjustedStroke(baseSize: number, pressure: number, isPen: boolean) {
+export function pressureAdjustedStroke(baseSize: number, pressure: number, isPen: boolean, sensitivity = 1) {
   if (!isPen) return baseSize;
   const response = 0.28 + pressure * 0.72;
-  return Math.round(Math.max(1.5, baseSize * response) * 10) / 10;
+  const adjustedResponse = 1 + (response - 1) * sensitivity;
+  return Math.round(Math.max(1.5, baseSize * adjustedResponse) * 10) / 10;
 }
 
-export function createStrokePoint(x: number, y: number, baseSize: number, pressure: number, isPen: boolean) {
-  return { x, y, size: pressureAdjustedStroke(baseSize, pressure, isPen) };
+export function createStrokePoint(x: number, y: number, baseSize: number, pressure: number, isPen: boolean, sensitivity = 1) {
+  return { x, y, size: pressureAdjustedStroke(baseSize, pressure, isPen, sensitivity) };
 }

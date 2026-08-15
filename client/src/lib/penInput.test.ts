@@ -22,4 +22,11 @@ describe("stylus input normalization", () => {
     const firm = createStrokePoint(20, 20, 20, 0.9, true);
     expect(firm.size).toBeGreaterThan(light.size);
   });
+
+  it("lets the user choose a gentler or more expressive pressure response", () => {
+    const gentle = pressureAdjustedStroke(20, 0.2, true, 0.45);
+    const expressive = pressureAdjustedStroke(20, 0.2, true, 1.45);
+    expect(gentle).toBeGreaterThan(expressive);
+    expect(pressureAdjustedStroke(20, 0.2, false, 1.45)).toBe(20);
+  });
 });
