@@ -21,6 +21,7 @@ import { historyControlAvailability } from "@/lib/canvasHistory";
 import { createShapeLayer, createTextLayer, layerKindLabel } from "@/lib/drawingElements";
 import { clearCanvasLayers, duplicateCanvasLayer, patchCanvasLayer, removeCanvasLayer, reorderCanvasLayer } from "@/lib/selectedElementActions";
 import { brushPresets, isActiveBrushPreset } from "@/lib/brushPresets";
+import { insertPdfBackground, inspectPdf, isPdfFile, renderPdfPage } from "@/lib/pdfImport";
 import "@/styles/drawingTools.css";
 import "@/styles/artStudio.css";
 import { nanoid } from "nanoid";
@@ -74,7 +75,15 @@ export default function Home() {
   const [canvasFuture, setCanvasFuture] = useState<WorksheetCanvasState[]>([]);
   const [exporting, setExporting] = useState<"png" | "svg" | "pdf" | null>(null);
   const [clearCanvasOpen, setClearCanvasOpen] = useState(false);
+  const [pdfImportOpen, setPdfImportOpen] = useState(false);
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [pdfName, setPdfName] = useState("");
+  const [pdfPageCount, setPdfPageCount] = useState(1);
+  const [pdfPageNumber, setPdfPageNumber] = useState(1);
+  const [pdfInspecting, setPdfInspecting] = useState(false);
+  const [pdfImporting, setPdfImporting] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const pdfFileRef = useRef<HTMLInputElement>(null);
   const selectedLayer = useMemo(() => canvas.layers.find((layer) => layer.id === selectedId) ?? null, [canvas.layers, selectedId]);
   const historyAvailability = useMemo(() => historyControlAvailability(canvasHistory.length, canvasFuture.length), [canvasFuture.length, canvasHistory.length]);
   const currentSnapshot = useMemo(() => JSON.stringify({ title: title.trim(), canvas }), [title, canvas]);
@@ -87,7 +96,7 @@ export default function Home() {
   const updateProject = trpc.project.update.useMutation({ onSuccess: (_, variables) => { setSavedSnapshot(JSON.stringify({ title: variables.title?.trim(), canvas: variables.canvasData ? JSON.parse(variables.canvasData) : canvas })); utils.project.list.invalidate(); toast.success("All changes saved."); }, onError: (error) => toast.error(error.message || "Changes could not be saved. Please try again.") });
   const removeProject = trpc.project.remove.useMutation({ onSuccess: () => { utils.project.list.invalidate(); toast.success("Worksheet removed."); }, onError: (error) => toast.error(error.message || "Worksheet could not be removed.") });
   const generateAsset = trpc.asset.generate.useMutation({ onSuccess: (asset) => { utils.asset.list.invalidate(); addAssetToCanvas(asset); toast.success("Your new asset is ready in the canvas and library."); }, onError: (error) => toast.error(error.message || "Artwork could not be generated. Please try again.") });
-  const saveAsset = trpc.asset.save.useMutation({ onSuccess: (asset) => { utils.asset.list.invalidate(); addAssetToCanvas(asset); toast.success("Asset added to your personal library."); }, onError: (error) => toast.error(error.message || "Asset could not be uploaded. Please try again.") });
+  const saveAsset = trpc.asset.save.useMutation({ onSuccess: () => utils.asset.list.invalidate(), onError: (error) => toast.error(error.message || "Asset could not be uploaded. Please try again.") });
   const deleteAsset = trpc.asset.remove.useMutation({ onSuccess: () => utils.asset.list.invalidate(), onError: (error) => toast.error(error.message || "Asset could not be removed.") });
 
   useEffect(() => {
@@ -239,9 +248,56 @@ export default function Home() {
     if (!file) return;
     if (!file.type.startsWith("image/")) { toast.error("Please select a PNG, JPEG, SVG, or other image file."); return; }
     const reader = new FileReader();
-    reader.onload = () => saveAsset.mutate({ kind: "upload", name: file.name.replace(/\.[^.]+$/, ""), dataUrl: String(reader.result) });
+    reader.onload = () => saveAsset.mutate({ kind: "upload", name: file.name.replace(/\.[^.]+$/, ""), dataUrl: String(reader.result) }, { onSuccess: (asset) => { addAssetToCanvas(asset); toast.success("Asset added to your personal library."); } });
     reader.readAsDataURL(file);
     event.target.value = "";
+  }
+
+  async function choosePdf(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (!isPdfFile(file)) { toast.error("Please select a PDF document."); return; }
+    try {
+      setPdfInspecting(true);
+      const details = await inspectPdf(file);
+      setPdfFile(file);
+      setPdfName(details.name);
+      setPdfPageCount(details.pageCount);
+      setPdfPageNumber(1);
+      setPdfImportOpen(true);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "The PDF could not be opened.");
+    } finally {
+      setPdfInspecting(false);
+    }
+  }
+
+  async function importPdfPage() {
+    if (!pdfFile) return;
+    try {
+      setPdfImporting(true);
+      const page = await renderPdfPage(pdfFile, pdfPageNumber);
+      saveAsset.mutate({ kind: "upload", name: `${page.name} page ${page.pageNumber}`, dataUrl: page.dataUrl }, {
+        onSuccess: (asset) => {
+          checkpointCanvas();
+          const insertion = insertPdfBackground(canvas, { id: nanoid(), name: page.name, src: asset.url, pageWidth: page.width, pageHeight: page.height });
+          const background = insertion.layer;
+          setCanvas(insertion.canvas);
+          setSelectedId(background.id);
+          setTool("brush");
+          setRightPane("layers");
+          setPanelVisible(true);
+          setPdfImportOpen(false);
+          setPdfFile(null);
+          toast.success(`Page ${page.pageNumber} is ready to annotate.`);
+        },
+        onSettled: () => setPdfImporting(false),
+      });
+    } catch (error) {
+      setPdfImporting(false);
+      toast.error(error instanceof Error ? error.message : "The PDF page could not be imported.");
+    }
   }
 
   if (loading) return <div className="studio-loading"><Loader2 className="animate-spin" /> Preparing your studio…</div>;
@@ -285,8 +341,9 @@ export default function Home() {
           </Tabs>
           {rightPane === "properties" && <PropertiesPanel selected={selectedLayer} onChange={updateSelected} onRemove={removeSelected} onDuplicate={duplicateSelected} onForward={() => selectedId && moveLayer(selectedId, "forward")} onBack={() => selectedId && moveLayer(selectedId, "back")} />}
           {rightPane === "layers" && <LayersPanel layers={canvas.layers} selectedId={selectedId} onSelect={setSelectedId} onForward={moveLayer} onBack={moveLayer} />}
-          {rightPane === "assets" && <AssetLibrary assets={assets} loading={assetsLoading} onAdd={addAssetToCanvas} onUpload={() => fileRef.current?.click()} onGenerate={() => setGeneratorOpen(true)} onRemove={(assetId) => deleteAsset.mutate({ assetId })}/>} 
+          {rightPane === "assets" && <AssetLibrary assets={assets} loading={assetsLoading} onAdd={addAssetToCanvas} onUpload={() => fileRef.current?.click()} onImportPdf={() => pdfFileRef.current?.click()} onGenerate={() => setGeneratorOpen(true)} onRemove={(assetId) => deleteAsset.mutate({ assetId })}/>} 
           <input ref={fileRef} type="file" accept="image/*" className="sr-only" onChange={uploadAsset}/>
+          <input ref={pdfFileRef} type="file" accept="application/pdf,.pdf" className="sr-only" onChange={choosePdf}/>
         </aside> : null}
       </section>
 
@@ -296,6 +353,7 @@ export default function Home() {
     <GenerateDialog open={generatorOpen} onOpenChange={setGeneratorOpen} loading={generateAsset.isPending} onGenerate={(input) => { generateAsset.mutate(input); setGeneratorOpen(false); }}/>
     <QuickClipartDialog open={clipartOpen} onOpenChange={setClipartOpen} loading={generateAsset.isPending} onGenerate={(prompt) => { try { const cleanPrompt = prepareCustomClipartPrompt(prompt); generateAsset.mutate({ kind: "clipart", name: cleanPrompt, prompt: cleanPrompt, style: "Clean hand-drawn worksheet clipart" }); setClipartOpen(false); } catch (error) { toast.error(error instanceof Error ? error.message : "Describe the clipart first."); } }}/>
     <PenDisplayDialog open={penSetupOpen} onOpenChange={setPenSetupOpen} detected={penDetected}/>
+    <Dialog open={pdfImportOpen} onOpenChange={(open) => { setPdfImportOpen(open); if (!open) setPdfFile(null); }}><DialogContent className="generate-dialog"><DialogHeader><div className="generator-icon"><Upload size={19}/></div><DialogTitle>Open a PDF page</DialogTitle><p>Choose which page to place as a protected background, then draw and annotate above it.</p></DialogHeader><div className="generate-field"><Label htmlFor="pdf-page-number">Page number</Label><Input id="pdf-page-number" type="number" min={1} max={pdfPageCount} value={pdfPageNumber} onChange={(event) => setPdfPageNumber(Math.min(pdfPageCount, Math.max(1, Number(event.target.value) || 1)))} /></div><div className="transparent-note"><span><strong>{pdfName || "Selected PDF"}</strong><br/>{pdfPageCount} {pdfPageCount === 1 ? "page" : "pages"} available. Imported pages are retained in saved worksheets and all exports.</span></div><Button className="generate-submit" disabled={pdfImporting || !pdfFile} onClick={importPdfPage}>{pdfImporting ? <Loader2 className="animate-spin"/> : <Upload size={16}/>}Open page and draw</Button></DialogContent></Dialog>
     <AlertDialog open={clearCanvasOpen} onOpenChange={setClearCanvasOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Clear this canvas?</AlertDialogTitle><AlertDialogDescription>This removes every element from the active worksheet. You can restore the cleared canvas immediately with Undo.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Keep elements</AlertDialogCancel><AlertDialogAction onClick={clearCanvas} className="bg-[#b64b45] hover:bg-[#963d38]">Clear canvas</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
   </div>;
 }
@@ -314,7 +372,7 @@ function NumberInput({ label, value, min, onChange }: { label: string; value: nu
 
 function LayersPanel({ layers, selectedId, onSelect, onForward, onBack }: { layers: StudioLayer[]; selectedId: string | null; onSelect: (id: string) => void; onForward: (id: string, direction: "forward" | "back") => void; onBack: (id: string, direction: "forward" | "back") => void }) { if (!layers.length) return <div className="empty-inspector"><div className="empty-orb"><Layers3 size={22}/></div><h3>No elements yet</h3><p>Create an AI asset, upload a favorite, add a shape, or take up the brush to begin your composition.</p></div>; return <div className="layer-list">{[...layers].reverse().map((layer) => <div key={layer.id} className={`layer-row ${layer.id === selectedId ? "is-active" : ""}`} onClick={() => onSelect(layer.id)}><div className="layer-thumb">{layer.type === "image" ? <img src={layer.src} alt=""/> : layer.type === "text" ? <Type size={15}/> : layer.type === "shape" ? <Square size={15}/> : <Brush size={15}/>}</div><div><strong>{layer.name}</strong><span>{layerKindLabel(layer)}</span></div><button aria-label="Bring layer forward" onClick={(event) => { event.stopPropagation(); onForward(layer.id, "forward"); }}><MoreHorizontal size={16}/></button></div>)}</div>; }
 
-function AssetLibrary({ assets, loading, onAdd, onUpload, onGenerate, onRemove }: { assets: Array<{ id: number; name: string; url: string; kind: string; prompt?: string | null }>; loading: boolean; onAdd: (asset: { id: number; name: string; url: string; kind: string }) => void; onUpload: () => void; onGenerate: () => void; onRemove: (id: number) => void }) { return <div className="asset-library"><div className="library-header"><div><strong>Your asset history</strong><span>Reusable across every worksheet.</span></div><button onClick={onUpload} aria-label="Upload image"><Upload size={17}/></button></div><div className="library-actions"><button onClick={onGenerate}><WandSparkles size={15}/>Generate</button><button onClick={onUpload}><ImagePlus size={15}/>Upload</button></div>{loading ? <div className="library-empty"><Loader2 className="animate-spin"/></div> : !assets.length ? <div className="library-empty"><div className="empty-orb"><Archive size={20}/></div><h3>Your library is ready</h3><p>Generated and uploaded elements will stay here for every future project.</p><Button onClick={onGenerate}><Sparkles size={15}/>Create your first asset</Button></div> : <div className="asset-grid">{assets.map((asset) => <div className="asset-card" key={asset.id}><button className="asset-preview" onClick={() => onAdd(asset)}><img src={asset.url} alt={asset.name}/><span>{kindNames[asset.kind as AssetKind] ?? "Asset"}</span></button><div><strong title={asset.name}>{asset.name}</strong><button onClick={() => onRemove(asset.id)} aria-label={`Remove ${asset.name}`}><Trash2 size={14}/></button></div></div>)}</div>}</div>; }
+function AssetLibrary({ assets, loading, onAdd, onUpload, onImportPdf, onGenerate, onRemove }: { assets: Array<{ id: number; name: string; url: string; kind: string; prompt?: string | null }>; loading: boolean; onAdd: (asset: { id: number; name: string; url: string; kind: string }) => void; onUpload: () => void; onImportPdf: () => void; onGenerate: () => void; onRemove: (id: number) => void }) { return <div className="asset-library"><div className="library-header"><div><strong>Your asset history</strong><span>Reusable across every worksheet.</span></div><button onClick={onUpload} aria-label="Upload image"><Upload size={17}/></button></div><div className="library-actions"><button onClick={onGenerate}><WandSparkles size={15}/>Generate</button><button onClick={onUpload}><ImagePlus size={15}/>Upload</button><button onClick={onImportPdf}><Upload size={15}/>Open PDF</button></div>{loading ? <div className="library-empty"><Loader2 className="animate-spin"/></div> : !assets.length ? <div className="library-empty"><div className="empty-orb"><Archive size={20}/></div><h3>Your library is ready</h3><p>Generated and uploaded elements will stay here for every future project.</p><Button onClick={onGenerate}><Sparkles size={15}/>Create your first asset</Button></div> : <div className="asset-grid">{assets.map((asset) => <div className="asset-card" key={asset.id}><button className="asset-preview" onClick={() => onAdd(asset)}><img src={asset.url} alt={asset.name}/><span>{kindNames[asset.kind as AssetKind] ?? "Asset"}</span></button><div><strong title={asset.name}>{asset.name}</strong><button onClick={() => onRemove(asset.id)} aria-label={`Remove ${asset.name}`}><Trash2 size={14}/></button></div></div>)}</div>}</div>; }
 
 function ProjectDialog({ open, onOpenChange, projects, activeId, onCreate, onOpen, onRemove }: { open: boolean; onOpenChange: (value: boolean) => void; projects: Array<{ id: number; title: string; updatedAt: Date | string }>; activeId: number | null; onCreate: () => void; onOpen: (project: { id: number; title: string; canvasData: string }) => void; onRemove: (id: number) => void }) { const utils = trpc.useUtils(); return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="project-dialog"><DialogHeader><DialogTitle>My worksheets</DialogTitle></DialogHeader><Button className="new-project-dialog" onClick={onCreate}><Plus size={16}/>Start a blank worksheet</Button><div className="project-list">{projects.length ? projects.map((project) => <div key={project.id} className={`project-item ${activeId === project.id ? "is-active" : ""}`}><button onClick={async () => { try { const data = await utils.project.get.fetch({ projectId: project.id }); if (data) onOpen(data); } catch (error) { toast.error(error instanceof Error ? error.message : "Worksheet could not be opened. Please try again."); } }}><div className="project-thumb"><span/><span/><span/></div><div><strong>{project.title}</strong><small>Edited {new Date(project.updatedAt).toLocaleDateString()}</small></div></button><button className="project-trash" onClick={() => onRemove(project.id)} aria-label={`Delete ${project.title}`}><Trash2 size={15}/></button></div>) : <div className="projects-empty">No saved worksheets yet. Your first save will appear here.</div>}</div></DialogContent></Dialog>; }
 

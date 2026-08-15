@@ -129,6 +129,10 @@ export default function WorksheetCanvas({ state, onChange, selectedId, onSelect,
     if (activeTool === "select" && layerId) {
       const layer = state.layers.find((item) => item.id === layerId);
       if (!layer) return;
+      if (layer.type === "image" && layer.locked) {
+        onSelect(layerId);
+        return;
+      }
       onEditStart?.();
       onSelect(layerId);
       pointerRef.current = { kind: "move", id: layerId, pointerId: event.pointerId, originX: current.x, originY: current.y, layerX: layer.x, layerY: layer.y, isPen: stylus.isPen };
@@ -200,7 +204,7 @@ export default function WorksheetCanvas({ state, onChange, selectedId, onSelect,
           {state.layers.map((layer) => {
             const active = layer.id === selectedId;
             const transform = `rotate(${layer.rotation} ${layer.x + layer.width / 2} ${layer.y + layer.height / 2})`;
-            return <g key={layer.id} data-layer-id={layer.id} transform={layer.type === "path" ? undefined : transform} className={`canvas-layer ${active ? "is-selected" : ""}`}>
+            return <g key={layer.id} data-layer-id={layer.id} transform={layer.type === "path" ? undefined : transform} className={`canvas-layer ${active ? "is-selected" : ""} ${layer.type === "image" && layer.locked ? "is-locked" : ""}`}>
               {layer.type === "image" ? <image href={layer.src} x={layer.x} y={layer.y} width={layer.width} height={layer.height} opacity={layer.opacity} preserveAspectRatio="none" /> : layer.type === "path" ? <VariableStroke layer={layer} /> : layer.type === "shape" ? <ShapeElement layer={layer} /> : <TextElement layer={layer} />}
               {active && layer.type !== "path" ? <rect className="selection-box" x={layer.x} y={layer.y} width={layer.width} height={layer.height || Math.max(layer.type === "shape" ? layer.strokeWidth : 0, 18)} fill="none" /> : null}
             </g>;

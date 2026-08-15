@@ -12,6 +12,8 @@ export type ImageLayer = {
   height: number;
   rotation: number;
   opacity: number;
+  /** Imported PDF pages are kept in place while users annotate above them. */
+  locked?: boolean;
 };
 
 export type PathLayer = {

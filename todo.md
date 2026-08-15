@@ -95,3 +95,9 @@
 - [x] Add regression coverage for ribbon geometry, tapering, and pressure easing.
 - [x] Visually verify natural stroke appearance and save the brush-rendering checkpoint.
 - [x] Repair angular ribbon edges: offset edge points are now smoothed with quadratic curves (matching the shared-join formula), so fast strokes render as true curves on canvas and in SVG/PNG/PDF export.
+- [x] Add client-side PDF import with a safe file picker and page-selection flow.
+- [x] Render the selected PDF page as a correctly scaled, locked worksheet-background layer for drawing and annotation.
+- [x] Preserve imported PDF-page backgrounds in save/load state and PNG/PDF/SVG exports.
+- [x] Add PDF-import helper regression coverage and verify the PDF-import entry point.
+- [x] Verify PDF page rendering in a real browser with the production import engine and verify that background insertion keeps annotations above the locked page in the exported canvas state.
+- [ ] Save the verified PDF annotation workflow as a new delivery checkpoint.
