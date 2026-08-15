@@ -23,6 +23,7 @@ describe("worksheet SVG export", () => {
   it("keeps pressure-sampled path widths in SVG exports", () => {
     const svg = renderWorksheetSvg({ transparentBackground: true, layers: [{ id: "p", type: "path", name: "stroke", d: "M 0 0", color: "#4263eb", strokeWidth: 12, mode: "draw", x: 0, y: 0, width: 0, height: 0, rotation: 0, opacity: 1, points: [{ x: 1, y: 2, size: 4 }, { x: 8, y: 9, size: 15 }] }] });
     expect(svg).toContain('stroke-width="15"');
+    expect(svg).toContain('Q 1 2 8 9');
   });
 
   it("renders editable shapes and text in worksheet SVG exports", () => {

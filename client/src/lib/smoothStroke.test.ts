@@ -1,0 +1,25 @@
+import { describe, expect, it } from "vitest";
+import { smoothStrokeSegments } from "./smoothStroke";
+
+describe("smoothStrokeSegments", () => {
+  it("joins a freehand series through midpoint-fitted quadratic curves", () => {
+    const segments = smoothStrokeSegments([
+      { x: 0, y: 0, size: 4 },
+      { x: 10, y: 20, size: 8 },
+      { x: 30, y: 20, size: 12 },
+      { x: 40, y: 0, size: 10 },
+    ]);
+
+    expect(segments).toEqual([
+      { d: "M 0 0 Q 10 20 20 20", size: 8 },
+      { d: "M 20 20 Q 30 20 35 10", size: 12 },
+      { d: "M 35 10 Q 40 0 40 0", size: 10 },
+    ]);
+  });
+
+  it("keeps the latest pressure width for a two-point stroke", () => {
+    expect(smoothStrokeSegments([{ x: 1, y: 2, size: 4 }, { x: 8, y: 9, size: 15 }])).toEqual([
+      { d: "M 1 2 Q 1 2 8 9", size: 15 },
+    ]);
+  });
+});

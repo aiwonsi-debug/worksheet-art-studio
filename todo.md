@@ -73,3 +73,5 @@
 - [x] Remove the duplicate pnpm-version declaration from the GitHub Actions setup so remote quality checks can run successfully.
 - [x] Push the CI repair and verify a successful GitHub Actions quality run.
 - [x] Save the verified advanced drawing and GitHub Actions update as a new delivery checkpoint.
+- [x] Smooth freehand pen and mouse curves while retaining pressure-sensitive stroke widths in canvas rendering and exports.
+- [x] Add regression coverage, visually inspect controlled rounded-curve SVG output, and confirm the live editor canvas loads after the rendering update.

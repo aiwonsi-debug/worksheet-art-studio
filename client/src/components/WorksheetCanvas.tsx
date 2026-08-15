@@ -6,6 +6,7 @@ import { WORKSHEET_HEIGHT, WORKSHEET_WIDTH } from "@/lib/studioTypes";
 import { createStrokePoint, pressureAdjustedStroke, resolveStylusInput } from "@/lib/penInput";
 import { fillSelectedShape, sampleLayerColor } from "@/lib/advancedDrawingTools";
 import { shapePoints } from "@/lib/drawingElements";
+import { smoothStrokeSegments } from "@/lib/smoothStroke";
 
 type PointerSession = { kind: "draw"; id: string; pointerId: number; baseSize: number; sensitivity: number; isPen: boolean } | { kind: "move"; id: string; pointerId: number; originX: number; originY: number; layerX: number; layerY: number; isPen: boolean } | null;
 
@@ -28,7 +29,7 @@ function VariableStroke({ layer }: { layer: PathLayer }) {
   const style = { mixBlendMode: layer.mode === "erase" ? ("destination-out" as any) : "normal" };
   if (!points?.length) return <path d={layer.d} fill="none" stroke={layer.mode === "erase" ? "#000" : layer.color} strokeWidth={layer.strokeWidth} strokeLinecap="round" strokeLinejoin="round" opacity={layer.opacity} style={style} />;
   if (points.length === 1) return <circle cx={points[0].x} cy={points[0].y} r={points[0].size / 2} fill={layer.mode === "erase" ? "#000" : layer.color} opacity={layer.opacity} style={style} />;
-  return <g opacity={layer.opacity} style={style}>{points.slice(1).map((point, index) => { const previous = points[index]; return <path key={`${point.x}-${point.y}-${index}`} d={`M ${previous.x} ${previous.y} L ${point.x} ${point.y}`} fill="none" stroke={layer.mode === "erase" ? "#000" : layer.color} strokeWidth={point.size} strokeLinecap="round" strokeLinejoin="round" />; })}</g>;
+  return <g opacity={layer.opacity} style={style}>{smoothStrokeSegments(points).map((segment, index) => <path key={`${layer.id}-segment-${index}`} d={segment.d} fill="none" stroke={layer.mode === "erase" ? "#000" : layer.color} strokeWidth={segment.size} strokeLinecap="round" strokeLinejoin="round" />)}</g>;
 }
 
 function ShapeElement({ layer }: { layer: ShapeLayer }) {
