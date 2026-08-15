@@ -25,48 +25,69 @@ describe("ribbonStrokePath", () => {
     const path = ribbonStrokePath(points);
     expect(path.startsWith("M")).toBe(true);
     expect(path.endsWith("Z")).toBe(true);
-    const firstMatch = path.match(/M ([\d.-]+) ([\d.-]+)/);
-    const endMatch = path.match(/A ([\d.-]+) ([\d.-]+) \d \d \d ([\d.-]+) ([\d.-]+) Z/);
-    expect(firstMatch).not.toBeNull();
+    const startMatch = path.match(/^M ([\d.-]+) ([\d.-]+)/);
+    expect(startMatch).not.toBeNull();
+    // The final quadratic cap ends at the starting edge point, guaranteeing a
+    // sealed closed shape with no gap between the last and first coordinates.
+    const endMatch = path.match(/Q ([\d.-]+) ([\d.-]+) ([\d.-]+) ([\d.-]+) Z$/);
     expect(endMatch).not.toBeNull();
-    expect(Number(firstMatch![1])).toBeCloseTo(Number(endMatch![3]), 1);
-    expect(Number(firstMatch![2])).toBeCloseTo(Number(endMatch![4]), 1);
+    expect(Number(endMatch![3])).toBeCloseTo(Number(startMatch![1]), 1);
+    expect(Number(endMatch![4])).toBeCloseTo(Number(startMatch![2]), 1);
+  });
+
+  it("traces both edges with quadratic curves instead of straight segments", () => {
+    const points = makePoints(8, false);
+    const path = ribbonStrokePath(points);
+    const qCount = (path.match(/ Q /g) ?? []).length;
+    // n-1 left-edge steps + 1 end-cap step + n-1 right-edge steps + 1 return
+    // cap step = 2n quadratic segments total; no straight L segments remain.
+    expect(qCount).toBe(points.length * 2);
+    expect(path.includes(" L ")).toBe(false);
   });
 
   it("tapers the stroke at its start and end while keeping the middle full width", () => {
     const points = makePoints(10, true);
     const path = ribbonStrokePath(points);
-    // The end caps use the tapered widths, which are smaller than the mid widths.
-    const firstCapMatch = path.match(/M ([\d.-]+) ([\d.-]+)/);
-    expect(firstCapMatch).not.toBeNull();
-    // Middle samples contribute full-width offsets; first cap offset is smaller.
-    expect(path).toContain("A ");
+    const startMatch = path.match(/^M ([\d.-]+) ([\d.-]+)/);
+    expect(startMatch).not.toBeNull();
+    const startX = Number(startMatch![1]);
+    const startY = Number(startMatch![2]);
+    // The first sample sits at x=100; with a tapered first width the start
+    // edge point stays offset from the spine, and the last cap returns there.
+    expect(startX).toBeLessThan(points[0].x);
+    const endReturn = path.match(/Q ([\d.-]+) ([\d.-]+) ([\d.-]+) ([\d.-]+) Z$/);
+    expect(endReturn).not.toBeNull();
+    expect(Number(endReturn![3])).toBeCloseTo(startX, 1);
+    expect(Number(endReturn![4])).toBeCloseTo(startY, 1);
   });
 
   it("keeps tapered cap widths smaller than full mid widths when pressure varies", () => {
     const points = makePoints(6, true);
     const path = ribbonStrokePath(points, 1, 0.55);
-    const capArcs = path.match(/A ([\d.]+)/g);
-    expect(capArcs).toHaveLength(2);
-    const arcRadii = capArcs!.map((arc) => Number(arc.replace("A ", "")));
-    // With an increasing size profile, the end cap (tapered toward a larger
-    // neighbor) sits between its own sample width and full width, while the
-    // start cap (tapered toward a larger neighbor too) stays below its own
-    // sample half-width. The reliable invariant: each cap is smaller than its
-    // endpoint's sample radius whenever that endpoint is larger than its
-    // neighbor — i.e., the taper always reduces the larger end.
-    const start = points[0].size;
-    const end = points[points.length - 1].size;
-    if (end >= points[points.length - 2].size) {
-      expect(arcRadii[1]).toBeLessThanOrEqual(end / 2);
-    }
-    if (start >= points[1].size) {
-      expect(arcRadii[0]).toBeLessThanOrEqual(start / 2);
-    }
-    // And both caps are strictly smaller than the widest point on the stroke,
-    // so no end ever bulges past the intended maximum width.
-    expect(arcRadii[0]).toBeLessThan(Math.max(...points.map((p) => p.size)) / 2);
-    expect(arcRadii[1]).toBeLessThan(Math.max(...points.map((p) => p.size)) / 2);
+    // Cap edge offsets derive from tapered widths: the first edge point
+    // displacement from its sample must stay within the tapered half width.
+    const startMatch = path.match(/^M ([\d.-]+) ([\d.-]+)/);
+    expect(startMatch).not.toBeNull();
+    const startOffset = Math.hypot(Number(startMatch![1]) - points[0].x, Number(startMatch![2]) - points[0].y);
+    // The closing cap is a quadratic whose control is the first right-edge
+    // point (built from the final sample's tapered width) and which seals
+    // back at the starting left-edge point.
+    const closingMatch = path.match(/Q ([\d.-]+) ([\d.-]+) ([\d.-]+) ([\d.-]+) Z$/);
+    expect(closingMatch).not.toBeNull();
+    const capControl = { x: Number(closingMatch![1]), y: Number(closingMatch![2]) };
+    const capEnd = { x: Number(closingMatch![3]), y: Number(closingMatch![4]) };
+    const widestHalf = Math.max(...points.map((p) => p.size)) / 2;
+    expect(startOffset).toBeGreaterThan(0);
+    expect(startOffset).toBeLessThan(widestHalf);
+    // The cap seals exactly at the starting left-edge point.
+    expect(capEnd.x).toBeCloseTo(Number(startMatch![1]), 1);
+    expect(capEnd.y).toBeCloseTo(Number(startMatch![2]), 1);
+    // The cap control derives from the final sample's tapered width, so its
+    // distance from the first sample (which it sits near) stays bounded by
+    // the stroke's own maximum half width — it never bulges past the widest
+    // point, and because the first sample is the narrowest here, the control
+    // cannot float arbitrarily far away.
+    expect(Math.hypot(capControl.x - points[0].x, capControl.y - points[0].y)).toBeLessThan(widestHalf);
   });
 
   it("stays continuous across zero and full smoothing strengths", () => {
