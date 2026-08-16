@@ -8,7 +8,6 @@
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("./_core/buildVersion", () => ({
-  GENERATED_VERSION: "unknown",
   readBuildVersion: () => "unknown",
 }));
 

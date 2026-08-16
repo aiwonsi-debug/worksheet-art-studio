@@ -29,6 +29,11 @@ function makeFetch(body: string, status = 200): typeof fetch {
 
 beforeEach(() => {
   reload().mockReset();
+  try {
+    sessionStorage.clear();
+  } catch {
+    // sessionStorage unavailable — isolation best-effort.
+  }
 });
 
 describe("enforceFreshBundle (mobile cache busting)", () => {
@@ -60,6 +65,25 @@ describe("enforceFreshBundle (mobile cache busting)", () => {
     const fetchImpl = makeFetch(JSON.stringify({ timestamp: 123 }));
     await enforceFreshBundle("oldver12", fetchImpl);
     expect(window.location.reload).not.toHaveBeenCalled();
+  });
+
+  it("does not reload when the server publishes the unknown sentinel", async () => {
+    const fetchImpl = makeFetch(JSON.stringify({ version: "unknown" }));
+    await enforceFreshBundle("oldver12", fetchImpl);
+    expect(window.location.reload).not.toHaveBeenCalled();
+  });
+
+  it("reloads when the build marker was never injected and the server publishes a version", async () => {
+    const fetchImpl = makeFetch(JSON.stringify({ version: "abc12345" }));
+    await enforceFreshBundle(null, fetchImpl);
+    expect(window.location.reload).toHaveBeenCalledTimes(1);
+  });
+
+  it("guards against reload loops by remembering the last reloaded version", async () => {
+    const fetchImpl = makeFetch(JSON.stringify({ version: "loopver" }));
+    await enforceFreshBundle("oldver12", fetchImpl);
+    await enforceFreshBundle("oldver12", fetchImpl);
+    expect(window.location.reload).toHaveBeenCalledTimes(1);
   });
 
   it("reloads for any differing published version string", async () => {
@@ -104,6 +128,18 @@ describe("readBuildVersion", () => {
       document.body.appendChild(el);
     }
     el.textContent = "not-json{";
+    expect(readBuildVersion()).toBeNull();
+    el.remove();
+  });
+
+  it("treats the uninjected platform placeholder as a missing marker", () => {
+    let el = document.getElementById("manus-build-version");
+    if (!el) {
+      el = document.createElement("script");
+      el.id = "manus-build-version";
+      document.body.appendChild(el);
+    }
+    el.textContent = '"__MANUS_BUILD_VERSION__"';
     expect(readBuildVersion()).toBeNull();
     el.remove();
   });

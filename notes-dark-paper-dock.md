@@ -66,3 +66,16 @@ Chosen approach: generate server/_core/buildVersion.ts at build time from client
 Dev-server churn issue: tsx watch restarts whenever server/_core/buildVersion.ts changes (written by buildStart on every vite build, incl. periodic platform builds). Mitigation in progress: move generated module into server/_core/ — actually tsx watches server/_core/index.ts and all its deps, so it restarts anyway. Next: make the generated module write happen ONLY when content changes (writeFileSync with same content still changes mtime → still restarts). Better mitigation: gate generation behind NODE_ENV !== development (dev doesn't need build-time value; dev can read version.json at runtime or use placeholder "dev"). In dev, appVersion reads client/public/__manus__/version.json at runtime (exists in dev sandbox); in production it uses the baked module.
 Remaining: (1) rewrite vitePluginBuildVersionMarker to generate server/_core/buildVersion.ts only in non-dev builds (or always but tolerate). (2) Update server/appVersion.ts to branch: dev reads file, prod uses baked constant. (3) Server test server/appVersionFallback.test.ts mocks "./_buildVersion" — update to mock "_core/buildVersion" or new module name. (4) pnpm test + check, checkpoint, verify prod curl /api/trpc/app-version returns JSON version, github push, deliver.
 Also note: periodic platform builds rewrite client/public/__manus__/version.json (new version each checkpoint deploy), so buildStart reading it yields the latest checkpoint hash. The fallback test mocks the generated module path.
+
+## State Aug 16 ~14:47 UTC — FINAL approach working
+FINAL approach (NO source mutation during builds):
+- scripts/build.mjs: runs `npx vite build` then esbuild API build with define: {DEPLOYED_VERSION: JSON.stringify(version from client/public/__manus__/version.json)}.
+- package.json build script now: "node scripts/build.mjs" (was "vite build && esbuild ...").
+- server/_core/buildVersion.ts: `declare const DEPLOYED_VERSION: string | undefined; const BAKED = typeof DEPLOYED_VERSION === "string" ? DEPLOYED_VERSION : null;` readBuildVersion() returns BAKED or runtime file read in dev, or "unknown".
+- vite.config.ts plugin now ONLY patches index.html marker (#manus-build-version); removed server file mutation.
+- client/src/lib/cacheBust.ts: reads marker (ignores "__MANUS_BUILD_VERSION__" placeholder), enforceFreshBundle(null|string) fetches /api/trpc/app-version, reloads when server version differs or build marker unknown; sessionStorage guard key "paperloom-reloaded-version" prevents reload loops.
+- Tests: 110 pass (27 files), clean typecheck. appVersionFallback.test.ts mocks readBuildVersion.
+- Verified sandbox build: dist/index.js contains the injected version (0c091528).
+- App renders fine (screenshot OK). Dev server restart churn STOPPED (no source mutation).
+- Production endpoint verified earlier: {"version":"27fbd4c9"} live on artstudio-wfaanbnb.manus.space/api/trpc/app-version.
+Remaining: checkpoint (publishes), verify prod endpoint shows NEW version, push github, deliver to user.

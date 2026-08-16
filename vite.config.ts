@@ -40,32 +40,12 @@ function vitePluginBuildVersionMarker(): Plugin {
             version = published.version;
           }
         }
-        // Patch the generated server-side module so esbuild can inline the
-        // deployed version into the production server bundle (see
-        // server/_core/buildVersion.ts and server/appVersion.ts). The source
-        // file is part of the repository; only the "unknown" default is
-        // replaced in place, so a missing build artifact degrades gracefully.
-        if (version !== null) {
-          const serverVersionModule = path.resolve(
-            PROJECT_ROOT,
-            "server",
-            "_core",
-            "buildVersion.ts"
-          );
-          if (fs.existsSync(serverVersionModule)) {
-            fs.writeFileSync(
-              serverVersionModule,
-              fs
-                .readFileSync(serverVersionModule, "utf8")
-                .replace(
-                  /export const GENERATED_VERSION: string = "[^"]*";/,
-                  `export const GENERATED_VERSION: string = ${JSON.stringify(version)};`
-                )
-            );
-          }
-        }
+        // Also patch the SPA index.html marker so the client can compare the
+        // build-embedded version against the deployed one without a network
+        // round trip when the marker was injected (see client/src/lib/cacheBust.ts).
       } catch {
-        // If the module cannot be written, appVersion falls back to "unknown".
+        // Injection failure is non-fatal — the client falls back to the
+        // server-published version at runtime.
       }
     },
     transformIndexHtml(html) {
