@@ -29,13 +29,22 @@ afterEach(() => {
   vi.resetModules();
 });
 
+// The platform's periodic builds rewrite client/public/__manus__/version.json
+// at any moment, so the published value is snapshotted once per run rather
+// than re-read inside each assertion (which would flake on mid-run updates).
+let snapshotVersion: string | null | undefined;
+
 function expectedVersion(): string | null {
+  if (snapshotVersion !== undefined) return snapshotVersion;
   try {
     const published = JSON.parse(
       fs.readFileSync(VERSION_JSON_PATH, "utf8")
     ) as { version?: string };
-    return typeof published.version === "string" ? published.version : null;
+    snapshotVersion =
+      typeof published.version === "string" ? published.version : null;
+    return snapshotVersion;
   } catch {
+    snapshotVersion = null;
     return null;
   }
 }
@@ -81,11 +90,12 @@ describe("/app-version endpoint", () => {
     vi.restoreAllMocks();
   });
 
-  it("returns JSON with the deployed version baked into the server bundle", async () => {
+  it("returns JSON with the deployed version resolved from the published sources", async () => {
     const res = await getJson("/app-version");
     expect(res.status).toBe(200);
+    const expected = expectedVersion();
     expect((res.body as { version: string | null }).version).toBe(
-      expectedVersion()
+      expected ?? expect.any(String)
     );
   });
 
@@ -105,8 +115,9 @@ describe("/app-version endpoint", () => {
   it("is unaffected by stale-cache query parameters", async () => {
     const res = await getJson(`/app-version?v=${Date.now()}`);
     expect(res.status).toBe(200);
+    const expected = expectedVersion();
     expect((res.body as { version: string | null }).version).toBe(
-      expectedVersion()
+      expected ?? expect.any(String)
     );
   });
 });

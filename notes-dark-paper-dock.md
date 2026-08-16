@@ -79,3 +79,10 @@ FINAL approach (NO source mutation during builds):
 - App renders fine (screenshot OK). Dev server restart churn STOPPED (no source mutation).
 - Production endpoint verified earlier: {"version":"27fbd4c9"} live on artstudio-wfaanbnb.manus.space/api/trpc/app-version.
 Remaining: checkpoint (publishes), verify prod endpoint shows NEW version, push github, deliver to user.
+
+## State Aug 16 ~15:15 UTC
+Definitive finding: platform production pipeline uses its own build commands; does NOT run scripts/build.mjs, does NOT run our Vite plugins (index.html marker stays placeholder "__MANUS_BUILD_VERSION__"), server container lacks client/public and dist/public. ONLY guaranteed runtime sources: platform env vars (none known to carry checkpoint) or self-derived server bundle hash.
+Chosen final strategy: server/_core/buildVersion.ts getBuildVersion() = prefer DEPLOYED_VERSION define, else BUNDLE_HASH = sha256 of server entry script file (process.argv[1] path relative; use readFileSync on dist/index.js or import.meta.resolve? Simpler: hash of dist/index.js itself via fs.readFileSync at path serverEntry). Actually simplest stable self-derived token: compute sha256 of a fixed list of server source files? No — must be stable across restarts; dist/index.js is stable between deploys. Use crypto.createHash('sha256') of dist/index.js contents (platform likely doesn't ship dist public dir... but dist/index.js IS the server entry being executed! It's dist/index.js in platform too presumably). Actually server container runs node dist/index.js — the file exists (it's argv[1]). Hash its own file (self-read) = stable deploy token, changes when server code deploys.
+Client-side: enforceFreshBundle already treats unknown build marker → reload for any non-unknown server version, with sessionStorage loop guard. The token is opaque, any string works.
+Tests to update: server/appVersion.test.ts (asserts version === published version.json value) → change to asserting truthy non-"unknown" (via mocking fs.readFileSync of serverEntry).
+Then checkpoint + wait rollout + verify prod returns non-unknown hash + push github + deliver.
