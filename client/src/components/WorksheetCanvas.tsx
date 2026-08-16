@@ -201,12 +201,12 @@ export default function WorksheetCanvas({ state, onChange, selectedId, onSelect,
 
   return (
     <div className={`worksheet-stage ${isDrawing ? "is-drawing" : ""}`}>
-      <svg ref={svgRef} viewBox={`0 0 ${WORKSHEET_WIDTH} ${WORKSHEET_HEIGHT}`} className={`worksheet-paper ${state.transparentBackground ? "is-transparent" : ""}`} style={{ touchAction: "none" }} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={stopPointer} onPointerCancel={stopPointer} onLostPointerCapture={stopPointer} onDoubleClick={() => setCanvasViewport({ scale: 1, offsetX: 0, offsetY: 0 })} aria-label="Editable worksheet canvas" data-worksheet-svg>
+      <svg ref={svgRef} viewBox={`0 0 ${WORKSHEET_WIDTH} ${WORKSHEET_HEIGHT}`} className={`worksheet-paper ${state.transparentBackground ? "is-transparent" : ""} ${state.darkPaper ? "is-dark" : ""}`} style={{ touchAction: "none" }} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={stopPointer} onPointerCancel={stopPointer} onLostPointerCapture={stopPointer} onDoubleClick={() => setCanvasViewport({ scale: 1, offsetX: 0, offsetY: 0 })} aria-label="Editable worksheet canvas" data-worksheet-svg>
         <defs>
           <pattern id="checker" width="28" height="28" patternUnits="userSpaceOnUse"><rect width="28" height="28" fill="#fff"/><rect width="14" height="14" fill="#f5f4f1"/><rect x="14" y="14" width="14" height="14" fill="#f5f4f1"/></pattern>
           <marker id="paperloom-arrow" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto" markerUnits="strokeWidth"><path d="M 0 0 L 8 4 L 0 8 z" fill="#42634f"/></marker>
         </defs>
-        <rect width={WORKSHEET_WIDTH} height={WORKSHEET_HEIGHT} fill={state.transparentBackground ? "url(#checker)" : "#fff"} />
+        <rect width={WORKSHEET_WIDTH} height={WORKSHEET_HEIGHT} fill={state.transparentBackground ? "url(#checker)" : state.darkPaper ? "#1e2422" : "#fff"} />
         <g transform={`translate(${viewport.offsetX} ${viewport.offsetY}) scale(${viewport.scale})`}>
         <g style={{ isolation: "isolate" }}>
           {state.layers.map((layer) => {

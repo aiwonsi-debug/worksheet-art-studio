@@ -80,6 +80,7 @@ export type StudioLayer = ImageLayer | PathLayer | ShapeLayer | TextLayer;
 
 export type WorksheetCanvasState = {
   transparentBackground: boolean;
+  darkPaper: boolean;
   layers: StudioLayer[];
 };
 
@@ -88,5 +89,6 @@ export const WORKSHEET_HEIGHT = 1160;
 
 export const createEmptyCanvas = (): WorksheetCanvasState => ({
   transparentBackground: false,
+  darkPaper: false,
   layers: [],
 });

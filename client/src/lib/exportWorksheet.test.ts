@@ -20,6 +20,18 @@ describe("worksheet SVG export", () => {
     expect(svg).toContain("fill=\"#ffffff\"");
   });
 
+  it("bakes a dark paper background into the SVG used by PNG and PDF exports when dark paper is on", () => {
+    const svg = renderWorksheetSvg({ transparentBackground: false, darkPaper: true, layers: [] });
+    expect(svg).toContain("fill=\"#1e2422\"");
+    expect(svg).not.toContain("fill=\"#ffffff\"");
+  });
+
+  it("keeps dark paper out of transparent PNG/PDF exports even when the toggle is on", () => {
+    const svg = renderWorksheetSvg({ transparentBackground: true, darkPaper: true, layers: [] });
+    expect(svg).not.toContain("fill=\"#1e2422\"");
+    expect(svg).not.toContain("fill=\"#ffffff\"");
+  });
+
   it("keeps a locked imported PDF-page background beneath drawn annotations in export output", () => {
     const svg = renderWorksheetSvg({ transparentBackground: false, layers: [
       { id: "pdf", type: "image", name: "Lesson PDF page", src: "data:image/png;base64,cGRm", x: 12, y: 0, width: 896, height: 1160, rotation: 0, opacity: 1, locked: true },

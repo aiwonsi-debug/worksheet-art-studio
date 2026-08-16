@@ -33,7 +33,7 @@ function renderLayer(layer: StudioLayer, imageSources: Map<string, string>) {
 }
 
 export function renderWorksheetSvg(state: WorksheetCanvasState, imageSources = new Map<string, string>()) {
-  const background = state.transparentBackground ? "" : `<rect width="${WORKSHEET_WIDTH}" height="${WORKSHEET_HEIGHT}" fill="#ffffff"/>`;
+  const background = state.transparentBackground ? "" : `<rect width="${WORKSHEET_WIDTH}" height="${WORKSHEET_HEIGHT}" fill="${state.darkPaper ? "#1e2422" : "#ffffff"}"/>`;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${WORKSHEET_WIDTH}" height="${WORKSHEET_HEIGHT}" viewBox="0 0 ${WORKSHEET_WIDTH} ${WORKSHEET_HEIGHT}"><defs><marker id="paperloom-arrow" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto" markerUnits="strokeWidth"><path d="M 0 0 L 8 4 L 0 8 z" fill="#42634f"/></marker></defs><g style="isolation:isolate">${background}${state.layers.map((layer) => renderLayer(layer, imageSources)).join("")}</g></svg>`;
 }
 
