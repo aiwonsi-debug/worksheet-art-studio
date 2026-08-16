@@ -5,7 +5,7 @@ import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
-import { registerAppVersionRoute } from "../appVersion";
+import { registerAppVersionRoute, registerDiagRoute } from "../appVersion";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
@@ -44,6 +44,7 @@ async function startServer() {
   // GET handler comes before the tRPC middleware.
   const trpcRouter = express.Router();
   registerAppVersionRoute(trpcRouter);
+  registerDiagRoute(trpcRouter);
   trpcRouter.use(
     createExpressMiddleware({
       router: appRouter,

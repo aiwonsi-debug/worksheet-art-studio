@@ -86,3 +86,18 @@ Chosen final strategy: server/_core/buildVersion.ts getBuildVersion() = prefer D
 Client-side: enforceFreshBundle already treats unknown build marker → reload for any non-unknown server version, with sessionStorage loop guard. The token is opaque, any string works.
 Tests to update: server/appVersion.test.ts (asserts version === published version.json value) → change to asserting truthy non-"unknown" (via mocking fs.readFileSync of serverEntry).
 Then checkpoint + wait rollout + verify prod returns non-unknown hash + push github + deliver.
+
+## State Aug 16 ~15:00 UTC — checkpoint 84d8b866 saved (auto-published)
+Final version resolution chain in server/_core/buildVersion.ts (per-request, no module cache):
+1. DEPLOYED_VERSION define (local build script only — platform ignores it)
+2. client/public/__manus__/version.json (dev only, also source for prod test expectations)
+3. dist/public/index.html #manus-build-version marker (when our local build refreshes it; platform HTML stays placeholder — never useful in prod)
+4. SHA-256 of process.argv[1] slice(0,8) (self-derived deploy token — GUARANTEED in prod, changes per server-code deploy)
+5. "unknown" sentinel (client never reloads for it)
+
+Resolution order: version.json BEFORE spa marker (sandbox dist stale; platform rewrites version.json frequently).
+appVersion.ts: registerAppVersionRoute on sub-router "/app-version" BEFORE tRPC middleware (sub-router mounted at /api/trpc in server/_core/index.ts).
+cacheBust.ts (client): readBuildVersion ignores placeholder "__MANUS_BUILD_VERSION__"; enforceFreshBundle(null|string) reloads when server version != build version or build unknown, sessionStorage guard key "paperloom-reloaded-version".
+Tests: 110 pass (snapshot version.json once per run; appVersionFallback.test.ts mocks readBuildVersion returning "unknown").
+Remaining: (1) verify prod /api/trpc/app-version returns NON-unknown after 84d8b866 rollout (wait ~90s, check). Expect a self-derived hash like sha-xxxx since platform skips define and lacks files. (2) Push to GitHub: cd /home/ubuntu/worksheet-art-studio && git add -A && git commit -m "..." && git push github main (remote name likely "github"; check `git remote -v`). (3) Deliver final message: tell user to refresh Brave on phone, dark artboard + white paper default, dock Light/Dark paper toggle, draw under toolbar works, cache busting automatic.
+GitHub remote check: earlier push used some remote; verify with git remote -v.
