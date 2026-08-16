@@ -47,6 +47,20 @@ function ToolButton({ active, label, onClick, children }: { active?: boolean; la
   return <Tooltip><TooltipTrigger asChild><button className={`tool-button ${active ? "is-active" : ""}`} onClick={onClick} aria-label={label}>{children}</button></TooltipTrigger><TooltipContent>{label}</TooltipContent></Tooltip>;
 }
 
+export function FloatingBrushToolbar({ size, opacity, onSizeChange, onOpacityChange }: { size: number; opacity: number; onSizeChange: (size: number) => void; onOpacityChange: (opacity: number) => void }) {
+  return <div className="floating-brush-toolbar" role="group" aria-label="Live brush controls" onPointerDown={(event) => event.stopPropagation()}>
+    <div className="floating-brush-toolbar__heading"><span className="floating-brush-toolbar__preview" style={{ width: Math.max(10, Math.min(24, size / 2)), height: Math.max(10, Math.min(24, size / 2)), opacity }}/><span><strong>Brush</strong><small>Live controls</small></span></div>
+    <div className="floating-brush-control">
+      <div><span>Size</span><output aria-label="Current brush size">{size} px</output></div>
+      <Slider aria-label="Brush size" value={[size]} onValueChange={(value) => onSizeChange(value[0] ?? size)} min={2} max={60} step={1}/>
+    </div>
+    <div className="floating-brush-control">
+      <div><span>Opacity</span><output aria-label="Current brush opacity">{Math.round(opacity * 100)}%</output></div>
+      <Slider aria-label="Brush opacity" value={[opacity * 100]} onValueChange={(value) => onOpacityChange((value[0] ?? opacity * 100) / 100)} min={5} max={100} step={1}/>
+    </div>
+  </div>;
+}
+
 export default function Home() {
   const { user, loading, logout } = useAuth();
   const utils = trpc.useUtils();
@@ -332,7 +346,7 @@ export default function Home() {
         </aside>
         <div className="art-canvas-zone">
           <div className="art-canvas-heading"><div><span>Artwork</span><strong>{activeBrushPreset ? brushPresets.find((preset) => preset.id === activeBrushPreset)?.label : "Custom brush"}</strong></div><small>Pinch or two-finger drag to navigate</small></div>
-          <div className="art-canvas-frame"><div className="canvas-history-controls" role="group" aria-label="Canvas history"><Tooltip><TooltipTrigger asChild><button onClick={undoCanvas} disabled={!historyAvailability.canUndo} aria-label="Undo last canvas edit"><Undo2 size={16}/></button></TooltipTrigger><TooltipContent>Undo canvas edit</TooltipContent></Tooltip><Tooltip><TooltipTrigger asChild><button onClick={redoCanvas} disabled={!historyAvailability.canRedo} aria-label="Redo last canvas edit"><Redo2 size={16}/></button></TooltipTrigger><TooltipContent>Redo canvas edit</TooltipContent></Tooltip></div><WorksheetCanvas state={canvas} onChange={setCanvas} selectedId={selectedId} onSelect={(id) => { setSelectedId(id); if (id) { setRightPane("properties"); setPanelVisible(true); } }} tool={tool} brushColor={brushColor} brushSize={brushSize} brushOpacity={brushOpacity} pressureSensitivity={pressureSensitivity} smoothingStrength={smoothingStrength} stabilizerStrength={stabilizerStrength} onPenDetected={() => setPenDetected(true)} onEditStart={checkpointCanvas} onPickColor={(color) => { setBrushColor(color); setBrushOpacity(1); toast.success("Sampled color is now your brush color."); }}/></div>
+          <div className="art-canvas-frame"><FloatingBrushToolbar size={brushSize} opacity={brushOpacity} onSizeChange={(size) => { setBrushSize(size); setTool("brush"); }} onOpacityChange={(opacity) => { setBrushOpacity(opacity); setTool("brush"); }}/><div className="canvas-history-controls" role="group" aria-label="Canvas history"><Tooltip><TooltipTrigger asChild><button onClick={undoCanvas} disabled={!historyAvailability.canUndo} aria-label="Undo last canvas edit"><Undo2 size={16}/></button></TooltipTrigger><TooltipContent>Undo canvas edit</TooltipContent></Tooltip><Tooltip><TooltipTrigger asChild><button onClick={redoCanvas} disabled={!historyAvailability.canRedo} aria-label="Redo last canvas edit"><Redo2 size={16}/></button></TooltipTrigger><TooltipContent>Redo canvas edit</TooltipContent></Tooltip></div><WorksheetCanvas state={canvas} onChange={setCanvas} selectedId={selectedId} onSelect={(id) => { setSelectedId(id); if (id) { setRightPane("properties"); setPanelVisible(true); } }} tool={tool} brushColor={brushColor} brushSize={brushSize} brushOpacity={brushOpacity} pressureSensitivity={pressureSensitivity} smoothingStrength={smoothingStrength} stabilizerStrength={stabilizerStrength} onPenDetected={() => setPenDetected(true)} onEditStart={checkpointCanvas} onPickColor={(color) => { setBrushColor(color); setBrushOpacity(1); toast.success("Sampled color is now your brush color."); }}/></div>
           <div className="art-canvas-meta"><span>Letter • 8.5 × 11 in</span><span>{canvas.layers.length} {canvas.layers.length === 1 ? "layer" : "layers"}</span><span>{canvas.transparentBackground ? "Transparency on" : "White paper"}</span></div>
         </div>
         {panelVisible ? <aside className="art-panel">

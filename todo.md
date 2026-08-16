@@ -108,4 +108,9 @@
 - [x] Save the verified worksheet-boundary update as a delivery checkpoint.
 - [x] Expand the active drawing surface to match the full visible worksheet and remove the non-drawable white margin.
 - [x] Add regression coverage for full-sheet pointer coordinate mapping and validate the behavior on a mobile viewport.
-- [ ] Save the verified full-sheet drawing correction as a delivery checkpoint.
+- [x] Save the verified full-sheet drawing correction as a delivery checkpoint.
+- [x] Add a compact floating brush toolbar with live size and opacity sliders that remains available while drawing.
+- [x] Add regression coverage for the floating brush controls and their active brush values.
+- [x] Verify the floating toolbar at desktop and phone dimensions, then publish the completed update.
+- [ ] Save a post-verification checkpoint for the floating brush toolbar update.
+- [ ] Push the published floating toolbar source update to the private GitHub repository.
