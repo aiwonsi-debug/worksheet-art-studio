@@ -12,7 +12,13 @@ import fs from "node:fs";
 import path from "node:path";
 
 export function registerAppVersionRoute(app: Express) {
-  app.get("/api/app-version", (_req, res) => {
+  // Production hosting only forwards /api/trpc (and /api/oauth) to the
+  // Express server — all other paths are rewritten to the SPA index.html by
+  // the hosting edge. Mount the version endpoint inside the proxied /api/trpc
+  // path space (as a plain GET route registered before the tRPC middleware,
+  // which only handles its own sub-routes) so the client can reach it in
+  // production as GET /api/trpc/app-version.
+  app.get("/api/trpc/app-version", (_req, res) => {
     try {
       const versionJsonPath = path.resolve(
         import.meta.dirname,

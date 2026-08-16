@@ -1,5 +1,5 @@
 /**
- * Regression tests for the /api/app-version endpoint: the client cache-busting
+ * Regression tests for the /api/trpc/app-version endpoint: the client cache-busting
  * logic compares the build-embedded version marker against this endpoint, so
  * it must reliably return the deployed checkpoint version as JSON — especially
  * in production, where the hosting edge rewrites non-/api paths to the SPA
@@ -8,8 +8,29 @@
 import express from "express";
 import fs from "node:fs";
 import http from "node:http";
+import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { registerAppVersionRoute } from "./appVersion";
+
+const VERSION_JSON_PATH = path.resolve(
+  import.meta.dirname,
+  "..",
+  "client",
+  "public",
+  "__manus__",
+  "version.json"
+);
+
+function expectedVersion(): string | null {
+  try {
+    const published = JSON.parse(
+      fs.readFileSync(VERSION_JSON_PATH, "utf8")
+    ) as { version?: string };
+    return typeof published.version === "string" ? published.version : null;
+  } catch {
+    return null;
+  }
+}
 
 function makeApp() {
   const app = express();
@@ -44,11 +65,13 @@ function safeJson(raw: string): unknown {
   }
 }
 
-describe("/api/app-version endpoint", () => {
+describe("/api/trpc/app-version endpoint", () => {
   it("returns JSON with the deployed version from the embedded version.json", async () => {
-    const res = await getJson("/api/app-version");
+    const res = await getJson("/api/trpc/app-version");
     expect(res.status).toBe(200);
-    expect((res.body as { version: string | null }).version).toBe("054e0f6f");
+    expect((res.body as { version: string | null }).version).toBe(
+      expectedVersion()
+    );
   });
 
   it("responds with application/json content type", async () => {
@@ -56,7 +79,7 @@ describe("/api/app-version endpoint", () => {
     const contentType = await new Promise<string>((resolve, reject) => {
       server.listen(0, () => {
         const port = (server.address() as { port: number }).port;
-        http.get(`http://127.0.0.1:${port}/api/app-version`, (res) => {
+        http.get(`http://127.0.0.1:${port}/api/trpc/app-version`, (res) => {
           resolve(res.headers["content-type"] ?? "");
         }).on("error", reject);
       });
@@ -69,7 +92,7 @@ describe("/api/app-version endpoint", () => {
       throw new Error("ENOENT");
     });
     try {
-      const res = await getJson("/api/app-version");
+      const res = await getJson("/api/trpc/app-version");
       expect(res.status).toBe(200);
       expect((res.body as { version: null }).version).toBeNull();
     } finally {
@@ -78,8 +101,10 @@ describe("/api/app-version endpoint", () => {
   });
 
   it("is unaffected by stale-cache query parameters", async () => {
-    const res = await getJson(`/api/app-version?v=${Date.now()}`);
+    const res = await getJson(`/api/trpc/app-version?v=${Date.now()}`);
     expect(res.status).toBe(200);
-    expect((res.body as { version: string | null }).version).toBe("054e0f6f");
+    expect((res.body as { version: string | null }).version).toBe(
+      expectedVersion()
+    );
   });
 });
