@@ -37,15 +37,20 @@ async function startServer() {
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   registerStorageProxy(app);
   registerOAuthRoutes(app);
-  registerAppVersionRoute(app);
-  // tRPC API
-  app.use(
-    "/api/trpc",
+  // tRPC API — the tRPC middleware matches any HTTP method and sub-path under
+  // "/api/trpc" and would swallow a plain app.get("/api/trpc/*") route on the
+  // outer app (its path matching ignores registration order for the same
+  // mount), so custom GET endpoints are registered on a sub-router where the
+  // GET handler comes before the tRPC middleware.
+  const trpcRouter = express.Router();
+  registerAppVersionRoute(trpcRouter);
+  trpcRouter.use(
     createExpressMiddleware({
       router: appRouter,
       createContext,
     })
   );
+  app.use("/api/trpc", trpcRouter);
   // development mode uses Vite, production mode uses static files
   if (process.env.NODE_ENV === "development") {
     await setupVite(app, server);

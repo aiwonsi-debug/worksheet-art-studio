@@ -1,5 +1,5 @@
 /**
- * Regression tests for the /api/trpc/app-version endpoint: the client cache-busting
+ * Regression tests for the /app-version endpoint: the client cache-busting
  * logic compares the build-embedded version marker against this endpoint, so
  * it must reliably return the deployed checkpoint version as JSON — especially
  * in production, where the hosting edge rewrites non-/api paths to the SPA
@@ -65,9 +65,9 @@ function safeJson(raw: string): unknown {
   }
 }
 
-describe("/api/trpc/app-version endpoint", () => {
+describe("/app-version endpoint", () => {
   it("returns JSON with the deployed version from the embedded version.json", async () => {
-    const res = await getJson("/api/trpc/app-version");
+    const res = await getJson("/app-version");
     expect(res.status).toBe(200);
     expect((res.body as { version: string | null }).version).toBe(
       expectedVersion()
@@ -79,7 +79,7 @@ describe("/api/trpc/app-version endpoint", () => {
     const contentType = await new Promise<string>((resolve, reject) => {
       server.listen(0, () => {
         const port = (server.address() as { port: number }).port;
-        http.get(`http://127.0.0.1:${port}/api/trpc/app-version`, (res) => {
+        http.get(`http://127.0.0.1:${port}/app-version`, (res) => {
           resolve(res.headers["content-type"] ?? "");
         }).on("error", reject);
       });
@@ -92,7 +92,7 @@ describe("/api/trpc/app-version endpoint", () => {
       throw new Error("ENOENT");
     });
     try {
-      const res = await getJson("/api/trpc/app-version");
+      const res = await getJson("/app-version");
       expect(res.status).toBe(200);
       expect((res.body as { version: null }).version).toBeNull();
     } finally {
@@ -101,7 +101,7 @@ describe("/api/trpc/app-version endpoint", () => {
   });
 
   it("is unaffected by stale-cache query parameters", async () => {
-    const res = await getJson(`/api/trpc/app-version?v=${Date.now()}`);
+    const res = await getJson(`/app-version?v=${Date.now()}`);
     expect(res.status).toBe(200);
     expect((res.body as { version: string | null }).version).toBe(
       expectedVersion()
