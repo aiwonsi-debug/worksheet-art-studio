@@ -9,6 +9,7 @@ import { shapePoints } from "@/lib/drawingElements";
 import { smoothStrokeSegments, stabilizeStrokePoint } from "@/lib/smoothStroke";
 import { ribbonStrokePath } from "@/lib/ribbonStroke";
 import { nextViewportFromTouchGesture, shouldNavigateTouch, type CanvasViewport, type ViewportTouchPoint } from "@/lib/canvasViewport";
+import { pointerAsViewport, pointerToSheet } from "@/lib/pointerToSheet";
 
 type PointerSession = { kind: "draw"; id: string; pointerId: number; baseSize: number; sensitivity: number; stabilizer: number; isPen: boolean } | { kind: "move"; id: string; pointerId: number; originX: number; originY: number; layerX: number; layerY: number; isPen: boolean } | null;
 
@@ -73,7 +74,8 @@ export default function WorksheetCanvas({ state, onChange, selectedId, onSelect,
   const asViewportTouch = (event: ReactPointerEvent<SVGSVGElement>): ViewportTouchPoint => {
     const rect = svgRef.current?.getBoundingClientRect();
     if (!rect) return { id: event.pointerId, x: 0, y: 0 };
-    return { id: event.pointerId, x: ((event.clientX - rect.left) / rect.width) * WORKSHEET_WIDTH, y: ((event.clientY - rect.top) / rect.height) * WORKSHEET_HEIGHT };
+    const mapped = pointerAsViewport(event.clientX, event.clientY, rect);
+    return { id: event.pointerId, x: mapped.x, y: mapped.y };
   };
 
   const resetTouchBaseline = () => {
@@ -83,9 +85,7 @@ export default function WorksheetCanvas({ state, onChange, selectedId, onSelect,
   const point = (event: ReactPointerEvent<SVGSVGElement>) => {
     const rect = svgRef.current?.getBoundingClientRect();
     if (!rect) return { x: 0, y: 0 };
-    const x = (((event.clientX - rect.left) / rect.width) * WORKSHEET_WIDTH - viewportRef.current.offsetX) / viewportRef.current.scale;
-    const y = (((event.clientY - rect.top) / rect.height) * WORKSHEET_HEIGHT - viewportRef.current.offsetY) / viewportRef.current.scale;
-    return { x: Math.max(0, Math.min(WORKSHEET_WIDTH, x)), y: Math.max(0, Math.min(WORKSHEET_HEIGHT, y)) };
+    return pointerToSheet(event.clientX, event.clientY, rect, viewportRef.current);
   };
 
   const updateLayer = (id: string, update: (layer: StudioLayer) => StudioLayer) => onChange({ ...state, layers: state.layers.map((layer) => layer.id === id ? update(layer) : layer) });
