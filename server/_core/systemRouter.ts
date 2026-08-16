@@ -42,6 +42,17 @@ export const systemRouter = router({
       distPublicExists: fs.existsSync("dist/public"),
       distPublicIndexExists: fs.existsSync("dist/public/index.html"),
       versionJsonExists: fs.existsSync("client/public/__manus__/version.json"),
+      distPublicAssetFiles: (() => {
+        try {
+          const html = fs.readFileSync("dist/public/index.html", "utf8");
+          const js = html.match(/src="\/assets\/[^"]*\.js"/g) ?? [];
+          const css = html.match(/href="\/assets\/[^"]*\.css"/g) ?? [];
+          const marker = html.match(/manus-build-version[^>]*>([\da-f]+)/) ?? null;
+          return { js: js.map((s) => s.slice(5, -1)), css: css.map((s) => s.slice(6, -1)), marker: marker ? marker[1] : null };
+        } catch {
+          return null;
+        }
+      })(),
       envKeys: Object.keys(process.env).filter((k) =>
         /MANUS|DEPLOY|VERSION|BUILD/i.test(k)
       ),
