@@ -14,6 +14,11 @@
 
   <body>
     <div id="root"></div>
+    <!-- Build version marker: replaced by the latest checkpoint version at
+         build time. The app compares it against /__manus__/version.json on
+         boot and hard-reloads when the server shows a newer deployment
+         (mobile browsers like Brave aggressively cache stale bundles). -->
+    <script id="manus-build-version" type="application/json">"__MANUS_BUILD_VERSION__"</script>
     <script type="module" src="/src/main.tsx"></script>
     <script
       defer

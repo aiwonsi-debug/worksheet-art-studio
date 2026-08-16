@@ -7,6 +7,17 @@ import superjson from "superjson";
 import App from "./App";
 import { startLogin } from "./const";
 import "./index.css";
+import { enforceFreshBundle, readBuildVersion } from "@/lib/cacheBust";
+
+// Mobile-browser cache busting: Brave/Android often serve a stale JS/CSS
+// bundle after a new deployment (aggressive HTTP caching). The build embeds
+// the current checkpoint version (see client/index.html); if the server-
+// published version.json shows a different deployment, force a hard reload
+// so users always get the fresh build.
+const bootBuildVersion = readBuildVersion();
+if (bootBuildVersion) {
+  void enforceFreshBundle(bootBuildVersion);
+}
 
 const queryClient = new QueryClient();
 

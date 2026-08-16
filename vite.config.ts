@@ -12,6 +12,32 @@ import { vitePluginManusRuntime } from "vite-plugin-manus-runtime";
 // =============================================================================
 
 const PROJECT_ROOT = import.meta.dirname;
+
+/**
+ * Injects the latest checkpoint version into the SPA so the client can detect
+ * stale mobile caches: the build-embedded marker is compared against the
+ * server-published /__manus__/version.json on boot, and a hard reload is
+ * forced when they differ.
+ */
+function vitePluginBuildVersionMarker(): Plugin {
+  return {
+    name: "manus-build-version-marker",
+    transformIndexHtml(html) {
+      try {
+        const versionJsonPath = path.resolve(PROJECT_ROOT, "client", "public", "__manus__", "version.json");
+        if (!fs.existsSync(versionJsonPath)) return html;
+        const published = JSON.parse(fs.readFileSync(versionJsonPath, "utf8")) as { version?: string };
+        if (typeof published.version !== "string") return html;
+        return html.replace(
+          /"__MANUS_BUILD_VERSION__"/,
+          JSON.stringify(published.version)
+        );
+      } catch {
+        return html;
+      }
+    },
+  };
+}
 const LOG_DIR = path.join(PROJECT_ROOT, ".manus-logs");
 const MAX_LOG_SIZE_BYTES = 1 * 1024 * 1024; // 1MB per log file
 const TRIM_TARGET_BYTES = Math.floor(MAX_LOG_SIZE_BYTES * 0.6); // Trim to 60% to avoid constant re-trimming
@@ -150,7 +176,7 @@ function vitePluginManusDebugCollector(): Plugin {
   };
 }
 
-const plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector()];
+const plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector(), vitePluginBuildVersionMarker()];
 
 export default defineConfig({
   plugins,
