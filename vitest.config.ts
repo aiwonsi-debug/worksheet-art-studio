@@ -18,6 +18,7 @@ export default defineConfig({
     environmentMatchGlobs: [
       ["client/src/pages/**/*.test.tsx", "jsdom"],
       ["client/src/lib/pdfImport.test.ts", "jsdom"],
+      ["client/src/lib/darkPaperToggle.test.tsx", "jsdom"],
     ],
     deps: {
       optimizer: {
