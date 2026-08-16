@@ -48,13 +48,16 @@ function ToolButton({ active, label, onClick, children }: { active?: boolean; la
 }
 
 export function FloatingBrushToolbar({ size, opacity, onSizeChange, onOpacityChange }: { size: number; opacity: number; onSizeChange: (size: number) => void; onOpacityChange: (opacity: number) => void }) {
-  return <div className="floating-brush-toolbar" role="group" aria-label="Live brush controls" onPointerDown={(event) => event.stopPropagation()}>
+  // The panel body is pass-through (pointer-events:none in CSS) so drawing
+  // gestures reach the canvas beneath the toolbar; the slider control rows
+  // stay interactive (pointer-events:auto). No React gating is needed.
+  return <div className="floating-brush-toolbar" role="group" aria-label="Live brush controls">
     <div className="floating-brush-toolbar__heading"><span className="floating-brush-toolbar__preview" style={{ width: Math.max(10, Math.min(24, size / 2)), height: Math.max(10, Math.min(24, size / 2)), opacity }}/><span><strong>Brush</strong><small>Live controls</small></span></div>
-    <div className="floating-brush-control">
+    <div className="floating-brush-control" data-floating-brush-control>
       <div><span>Size</span><output aria-label="Current brush size">{size} px</output></div>
       <Slider aria-label="Brush size" value={[size]} onValueChange={(value) => onSizeChange(value[0] ?? size)} min={2} max={60} step={1}/>
     </div>
-    <div className="floating-brush-control">
+    <div className="floating-brush-control" data-floating-brush-control>
       <div><span>Opacity</span><output aria-label="Current brush opacity">{Math.round(opacity * 100)}%</output></div>
       <Slider aria-label="Brush opacity" value={[opacity * 100]} onValueChange={(value) => onOpacityChange((value[0] ?? opacity * 100) / 100)} min={5} max={100} step={1}/>
     </div>

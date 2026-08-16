@@ -120,3 +120,4 @@
 - [x] Verify full-sheet drawing at a phone viewport and publish the fix.
 - [x] User reports "cant open pages ?": diagnosed Brave-mobile worker failure, implemented resilient worker setup with CDN fallback, added regression coverage (80 tests passing), verified on desktop and phone viewports, published the fix, and synced to the private GitHub repository.
 - [x] Change the studio/artboard background to a darker tone (#1c2120 canvas zone, #222927 workspace) so the worksheet area stands out at all zoom levels, verified at desktop and phone viewports with 80 tests passing, published, and synced to GitHub.
+- [x] User reports "floating menu overlap cant draw": floating brush toolbar blocks drawing beneath it; pass drawing pointer events through the toolbar body while keeping sliders/controls interactive, verified at desktop and phone viewports, published, and synced to GitHub.

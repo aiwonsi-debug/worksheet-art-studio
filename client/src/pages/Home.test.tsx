@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -12,6 +12,23 @@ class ResizeObserverMock {
 }
 
 vi.stubGlobal("ResizeObserver", ResizeObserverMock);
+
+import fs from "node:fs";
+import path from "node:path";
+
+function injectToolbarStylesheet() {
+  // Vitest does not inject CSS imports into jsdom, so load the stylesheet
+  // manually so computed-style assertions resolve the real rules.
+  const css = fs.readFileSync(path.resolve(import.meta.dirname, "../styles/artStudio.css"), "utf8");
+  if (css && !document.querySelector('style[data-injected="artStudio"]')) {
+    const style = document.createElement("style");
+    style.setAttribute("data-injected", "artStudio");
+    style.textContent = css;
+    document.head.appendChild(style);
+  }
+}
+
+injectToolbarStylesheet();
 
 afterEach(() => cleanup());
 
@@ -53,5 +70,29 @@ describe("FloatingBrushToolbar", () => {
     opacityThumb!.focus();
     await user.keyboard("{ArrowRight}");
     expect(onOpacityChange).toHaveBeenCalledWith(0.51);
+  });
+
+  it("passes drawing pointer events through the panel body while keeping the sliders interactive", async () => {
+    const user = userEvent.setup();
+    const onSizeChange = vi.fn();
+    const onOpacityChange = vi.fn();
+    render(<FloatingBrushToolbar size={12} opacity={0.5} onSizeChange={onSizeChange} onOpacityChange={onOpacityChange} />);
+    const panel = screen.getByRole("group", { name: "Live brush controls" });
+
+    const slider = screen.getByLabelText("Brush size").querySelector<HTMLElement>("[role=slider]")!;
+    const heading = panel.querySelector<HTMLElement>(".floating-brush-toolbar__heading")!;
+
+    // The panel body is pass-through (pointer-events:none) so drawing gestures
+    // reach the canvas beneath the floating toolbar, while the slider rows
+    // stay interactive (pointer-events:auto). jsdom cannot model CSS
+    // hit-testing, so we assert the pointer-events rules and control layout.
+    expect(getComputedStyle(panel).pointerEvents).toBe("none");
+    expect(getComputedStyle(slider).pointerEvents).toBe("auto");
+    expect(heading).toBeTruthy();
+    expect(slider).toBeTruthy();
+
+    slider.focus();
+    await user.keyboard("{ArrowRight}");
+    expect(onSizeChange).toHaveBeenCalledWith(13);
   });
 });
