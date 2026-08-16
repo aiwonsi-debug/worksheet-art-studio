@@ -113,4 +113,5 @@
 - [x] Add regression coverage for the floating brush controls and their active brush values.
 - [x] Verify the floating toolbar at desktop and phone dimensions, then publish the completed update.
 - [x] Save a post-verification checkpoint for the floating brush toolbar update.
-- [ ] Push the published floating toolbar source update to the private GitHub repository.
+- [x] Push the published floating toolbar source update to the private GitHub repository.
+- [x] Verify that the private GitHub main branch contains the floating-toolbar checkpoint and current checklist update.
