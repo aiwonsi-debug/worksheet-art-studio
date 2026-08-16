@@ -25,8 +25,11 @@ export async function enforceFreshBundle(
   buildVersion: string,
   fetchImpl: typeof fetch = globalThis.fetch.bind(globalThis)
 ): Promise<void> {
+  // Production hosting rewrites non-/api paths (including /__manus__/version.json)
+  // to the SPA index.html, so the deployed version is exposed through the
+  // Express API route /api/app-version instead (see server/appVersion.ts).
   try {
-    const res = await fetchImpl("/__manus__/version.json", {
+    const res = await fetchImpl(`/api/app-version?v=${Date.now()}`, {
       cache: "no-store",
       headers: { accept: "application/json" },
     });

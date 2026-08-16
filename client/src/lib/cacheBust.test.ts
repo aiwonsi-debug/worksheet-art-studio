@@ -3,7 +3,7 @@
  *
  * Regression tests for the mobile cache-busting mechanism: the app compares
  * the build-embedded version marker against the server-published
- * /__manus__/version.json on boot and hard-reloads when they differ, so
+ * /api/app-version on boot and hard-reloads when they differ, so
  * Brave/Android users with aggressively cached bundles get the fresh build.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
