@@ -118,3 +118,4 @@
 - [x] Fix mobile regression: worksheet shows a white margin with a small inner drawing rectangle instead of filling the visible area edge-to-edge; drawing does not register outside the inner rectangle.
 - [x] Add/extend regression coverage asserting the full-sheet pointer mapping holds across the mobile layout.
 - [x] Verify full-sheet drawing at a phone viewport and publish the fix.
+- [ ] User reports "cant open pages ?": PDF page import flow fails or is unusable; diagnose and fix page selection, verify on production, add regression coverage, publish and sync to GitHub.

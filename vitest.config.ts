@@ -15,6 +15,19 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["server/**/*.test.ts", "server/**/*.spec.ts", "client/src/**/*.test.ts", "client/src/**/*.spec.ts", "client/src/**/*.test.tsx", "client/src/**/*.spec.tsx"],
-    environmentMatchGlobs: [["client/src/pages/**/*.test.tsx", "jsdom"]],
+    environmentMatchGlobs: [
+      ["client/src/pages/**/*.test.tsx", "jsdom"],
+      ["client/src/lib/pdfImport.test.ts", "jsdom"],
+    ],
+    deps: {
+      optimizer: {
+        web: {
+          exclude: ["pdfjs-dist"],
+        },
+        ssr: {
+          exclude: ["pdfjs-dist"],
+        },
+      },
+    },
   },
 });

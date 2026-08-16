@@ -5,6 +5,24 @@ export type RenderedPdfPage = PdfPageInfo & { pageNumber: number; dataUrl: strin
 
 const MAX_RENDER_DIMENSION = 1440;
 
+/**
+ * Build the version-matched pdf.js CDN worker URL used when the bundled
+ * worker module cannot be loaded (e.g. Brave Android with strict shields).
+ * Exported as a pure function so its shape is regression-testable without a
+ * worker runtime.
+ */
+export function fallbackWorkerUrl(pdfJsVersion: string): string {
+  return new URL(`https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfJsVersion}/pdf.worker.min.mjs`, globalThis.document.baseURI).href;
+}
+
+/**
+ * Resolve a worker module URL against the document origin so module workers
+ * never load from a malformed relative path.
+ */
+export function resolveWorkerUrl(moduleUrl: string): string {
+  return new URL(moduleUrl, globalThis.document.baseURI).href;
+}
+
 export function isPdfFile(file: File) {
   return file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
 }
@@ -32,12 +50,79 @@ export function insertPdfBackground(canvas: WorksheetCanvasState, input: { id: s
   return { canvas: { ...canvas, transparentBackground: false, layers: [layer, ...canvas.layers] }, layer };
 }
 
+type PdfjsNamespace = typeof import("pdfjs-dist");
+
+let cachedPdfjs: PdfjsNamespace | null = null;
+let workerSetupFailed = false;
+let workerConfigured = false;
+
+/**
+ * Loader for the pdf.js module namespace. Exported so tests can substitute the
+ * worker-free legacy build, keeping the worker configuration and fallback
+ * logic verifiable against the real library without mocking package specifiers.
+ */
+export async function resolvePdfjsBundle(): Promise<PdfjsNamespace> {
+  return import("pdfjs-dist");
+}
+
+async function loadPdfjs(): Promise<PdfjsNamespace> {
+  if (!cachedPdfjs) {
+    cachedPdfjs = await resolvePdfjsBundle();
+  }
+  return cachedPdfjs;
+}
+
+async function loadFallbackPdfjs(): Promise<PdfjsNamespace> {
+  // When the bundled worker module cannot be loaded (e.g. Brave Android with
+  // strict shields blocking the hashed asset), fall back to the matching
+  // worker from the pdf.js CDN. pdfjs wraps cross-origin URLs in a Blob
+  // wrapper automatically, which loads reliably on mobile.
+  const pdfjs = await loadPdfjs();
+  const workerUrl = fallbackWorkerUrl(pdfjs.version);
+  setWorkerSrc(workerUrl);
+  cachedPdfjs = pdfjs;
+  return pdfjs;
+}
+
+/**
+ * Load the bundled pdf.js worker URL. Kept as a named export so tests can
+ * replace it (Vite's `?url` specifier is not mockable directly in Vitest).
+ */
+export async function loadBundledWorkerUrl(): Promise<string> {
+  const workerModule = await import("pdfjs-dist/build/pdf.worker.min.mjs?url");
+  return workerModule.default as string;
+}
+
+async function ensureWorker(): Promise<void> {
+  if (workerConfigured || workerSetupFailed) return; // Configured once, or fell back to CDN.
+  try {
+    // Resolve relative asset URLs against the document origin so module workers
+    // never load from a malformed path (a known failure on some mobile browsers
+    // such as Brave Android with strict shields).
+    const workerUrl = resolveWorkerUrl(await loadBundledWorkerUrl());
+    setWorkerSrc(workerUrl);
+    workerConfigured = true;
+  } catch {
+    workerSetupFailed = true;
+  }
+}
+
+/**
+ * Apply the worker source to the loaded pdf.js library.
+ * Exported as a named function so tests can spy on the configured URL without
+ * touching pdf.js internals (module namespaces freeze property assignment).
+ */
+export function setWorkerSrc(workerUrl: string): void {
+  // Lazily loading here keeps the cached library shared with rendering.
+  void (async () => {
+    const pdfjs = await loadPdfjs();
+    pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
+  })();
+}
+
 async function loadPdf(file: File) {
-  const [pdfjs, workerModule] = await Promise.all([
-    import("pdfjs-dist"),
-    import("pdfjs-dist/build/pdf.worker.min.mjs?url"),
-  ]);
-  pdfjs.GlobalWorkerOptions.workerSrc = workerModule.default;
+  await ensureWorker();
+  const pdfjs = workerSetupFailed ? await loadFallbackPdfjs() : await loadPdfjs();
   return pdfjs.getDocument({ data: await file.arrayBuffer() }).promise;
 }
 

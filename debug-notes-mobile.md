@@ -34,3 +34,6 @@ DIFF: user screenshot paper ≈ 62% of frame width with thick white margins all 
 ## Next checks
 - Whether artStudio.css is imported in the new studio route (client/src/App.tsx or Home.tsx import '../styles/artStudio.css'?)
 - Whether published bundle at prod contains the CSS (fetch prod HTML/asset list).
+
+## Resolution (2026-08-16)
+Root cause: the pinch gesture allowed zooming out to 0.55, shrinking the paper inside the white stage on phones — so strokes outside the visible (shrunk) SVG could not register and the user saw a white margin with a small inner drawing rectangle. Fix: raised the pinch zoom floor from 0.55 to 1 in nextViewportFromTouchGesture (client/src/lib/canvasViewport.ts), so the sheet always fills the frame edge-to-edge; pan and pinch-zoom-in (up to 2.5) still work. Checkpoint fd145d3b published to production (artstudio-wfaanbnb.manus.space); tests 74/74; synced to private GitHub repo main at fd145d3b.
