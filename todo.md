@@ -112,5 +112,5 @@
 - [x] Add a compact floating brush toolbar with live size and opacity sliders that remains available while drawing.
 - [x] Add regression coverage for the floating brush controls and their active brush values.
 - [x] Verify the floating toolbar at desktop and phone dimensions, then publish the completed update.
-- [ ] Save a post-verification checkpoint for the floating brush toolbar update.
+- [x] Save a post-verification checkpoint for the floating brush toolbar update.
 - [ ] Push the published floating toolbar source update to the private GitHub repository.
