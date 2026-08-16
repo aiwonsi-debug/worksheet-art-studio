@@ -22,11 +22,65 @@ const PROJECT_ROOT = import.meta.dirname;
 function vitePluginBuildVersionMarker(): Plugin {
   return {
     name: "manus-build-version-marker",
+    buildStart() {
+      try {
+        const versionJsonPath = path.resolve(
+          PROJECT_ROOT,
+          "client",
+          "public",
+          "__manus__",
+          "version.json"
+        );
+        let version: string | null = null;
+        if (fs.existsSync(versionJsonPath)) {
+          const published = JSON.parse(
+            fs.readFileSync(versionJsonPath, "utf8")
+          ) as { version?: string };
+          if (typeof published.version === "string") {
+            version = published.version;
+          }
+        }
+        // Patch the generated server-side module so esbuild can inline the
+        // deployed version into the production server bundle (see
+        // server/_core/buildVersion.ts and server/appVersion.ts). The source
+        // file is part of the repository; only the "unknown" default is
+        // replaced in place, so a missing build artifact degrades gracefully.
+        if (version !== null) {
+          const serverVersionModule = path.resolve(
+            PROJECT_ROOT,
+            "server",
+            "_core",
+            "buildVersion.ts"
+          );
+          if (fs.existsSync(serverVersionModule)) {
+            fs.writeFileSync(
+              serverVersionModule,
+              fs
+                .readFileSync(serverVersionModule, "utf8")
+                .replace(
+                  /export const GENERATED_VERSION: string = "[^"]*";/,
+                  `export const GENERATED_VERSION: string = ${JSON.stringify(version)};`
+                )
+            );
+          }
+        }
+      } catch {
+        // If the module cannot be written, appVersion falls back to "unknown".
+      }
+    },
     transformIndexHtml(html) {
       try {
-        const versionJsonPath = path.resolve(PROJECT_ROOT, "client", "public", "__manus__", "version.json");
+        const versionJsonPath = path.resolve(
+          PROJECT_ROOT,
+          "client",
+          "public",
+          "__manus__",
+          "version.json"
+        );
         if (!fs.existsSync(versionJsonPath)) return html;
-        const published = JSON.parse(fs.readFileSync(versionJsonPath, "utf8")) as { version?: string };
+        const published = JSON.parse(
+          fs.readFileSync(versionJsonPath, "utf8")
+        ) as { version?: string };
         if (typeof published.version !== "string") return html;
         return html.replace(
           /"__MANUS_BUILD_VERSION__"/,
