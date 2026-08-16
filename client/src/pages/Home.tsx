@@ -29,6 +29,23 @@ import { toast } from "sonner";
 import { Archive, ArrowDownToLine, ArrowRight, Brush, ChevronRight, Circle, CircleHelp, Copy, Diamond, Eraser, FilePlus2, FolderOpen, Grid2X2, ImagePlus, Layers3, Loader2, LogOut, Minus, MoreHorizontal, MousePointer2, PaintBucket, Palette, PenLine, Pipette, Plus, Redo2, RotateCcw, Sparkles, Square, Star, Trash2, Triangle, Type, Undo2, Upload, WandSparkles } from "lucide-react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
+// JS-level toolbar pass-through: if a pointer starts over the toolbar panel
+// (outside the slider control rows), the gesture is redirected to the
+// worksheet SVG so drawing never breaks under the toolbar — independent of
+// CSS pointer-events, which Brave's shields can interfere with.
+function redirectPanelPointerToCanvas(event: PointerEvent): void {
+  if (event.target === null || !(event.target instanceof Element)) return;
+  const panel = (event.target as Element).closest(".floating-brush-toolbar");
+  if (!panel) return;
+  if ((event.target as Element).closest("[data-floating-brush-control]")) return; // controls stay interactive
+  const sheet = document.querySelector<SVGSVGElement>("svg[data-worksheet-svg]");
+  if (!sheet) return;
+  // Translate the event into synthetic pointer events on the SVG so React's
+  // drawing session (capture + pointermove) continues without interruption.
+  const init: PointerEventInit = { bubbles: true, cancelable: true, pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, pressure: event.pressure, tiltX: event.tiltX, tiltY: event.tiltY, isPrimary: event.isPrimary, pointerType: event.pointerType, width: event.width, height: event.height };
+  sheet.dispatchEvent(new PointerEvent(event.type === "pointerdown" ? "pointerdown" : event.type === "pointermove" ? "pointermove" : event.type === "pointerup" ? "pointerup" : "pointercancel", init));
+}
+
 const kindNames: Record<AssetKind, string> = { clipart: "Clipart", border: "Border", header: "Header", drawing: "Drawing", upload: "Upload" };
 const defaultCanvas = createEmptyCanvas();
 const emptySnapshot = JSON.stringify({ title: "Untitled worksheet", canvas: defaultCanvas });
@@ -48,10 +65,43 @@ function ToolButton({ active, label, onClick, children }: { active?: boolean; la
 }
 
 export function FloatingBrushToolbar({ size, opacity, onSizeChange, onOpacityChange }: { size: number; opacity: number; onSizeChange: (size: number) => void; onOpacityChange: (opacity: number) => void }) {
-  // The panel body is pass-through (pointer-events:none in CSS) so drawing
-  // gestures reach the canvas beneath the toolbar; the slider control rows
-  // stay interactive (pointer-events:auto). No React gating is needed.
-  return <div className="floating-brush-toolbar" role="group" aria-label="Live brush controls">
+  // Pass-through is enforced in JavaScript: a capture-phase listener on the
+  // panel redirects pointer gestures over the panel body to the worksheet SVG
+  // (see redirectPanelPointerToCanvas), while slider control rows stay
+  // interactive. CSS pointer-events:none is a secondary safety layer.
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    // Capture the whole gesture at the panel: once a pointer starts over the
+    // panel body, subsequent move/up/cancel events keep routing to the SVG
+    // even if the element under the finger changes.
+    const panel = toolbarRef.current;
+    if (!panel) return;
+    const sessions = new Map<number, boolean>();
+    const onDown = (event: PointerEvent) => {
+      if (!(event.target instanceof Element) || (event.target as Element).closest("[data-floating-brush-control]")) return;
+      sessions.set(event.pointerId, true);
+      redirectPanelPointerToCanvas(event);
+    };
+    const onMove = (event: PointerEvent) => {
+      if (!sessions.has(event.pointerId)) return;
+      redirectPanelPointerToCanvas(event);
+    };
+    const onEnd = (event: PointerEvent) => {
+      if (!sessions.delete(event.pointerId)) return;
+      redirectPanelPointerToCanvas(event);
+    };
+    panel.addEventListener("pointerdown", onDown, { capture: true });
+    panel.addEventListener("pointermove", onMove, { capture: true });
+    panel.addEventListener("pointerup", onEnd, { capture: true });
+    panel.addEventListener("pointercancel", onEnd, { capture: true });
+    return () => {
+      panel.removeEventListener("pointerdown", onDown, { capture: true });
+      panel.removeEventListener("pointermove", onMove, { capture: true });
+      panel.removeEventListener("pointerup", onEnd, { capture: true });
+      panel.removeEventListener("pointercancel", onEnd, { capture: true });
+    };
+  }, []);
+  return <div ref={toolbarRef} className="floating-brush-toolbar" role="group" aria-label="Live brush controls">
     <div className="floating-brush-toolbar__heading"><span className="floating-brush-toolbar__preview" style={{ width: Math.max(10, Math.min(24, size / 2)), height: Math.max(10, Math.min(24, size / 2)), opacity }}/><span><strong>Brush</strong><small>Live controls</small></span></div>
     <div className="floating-brush-control" data-floating-brush-control>
       <div><span>Size</span><output aria-label="Current brush size">{size} px</output></div>

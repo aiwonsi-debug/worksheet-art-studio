@@ -155,6 +155,14 @@ export default function WorksheetCanvas({ state, onChange, selectedId, onSelect,
   };
 
   const handlePointerMove = (event: ReactPointerEvent<SVGSVGElement>) => {
+    // Android/Brave can silently drop pointer capture when the gesture passes
+    // under an overlapping overlay; re-capture defensively so the stroke keeps
+    // flowing (pointermove still fires on the original capture target).
+    if (pointerRef.current && pointerRef.current.pointerId === event.pointerId && !event.currentTarget.hasPointerCapture(event.pointerId)) {
+      try { event.currentTarget.setPointerCapture(event.pointerId); } catch {
+        // Capture lost for good (element detached) — leave the session to stop naturally.
+      }
+    }
     if (event.pointerType === "touch" && touchPointsRef.current.has(event.pointerId) && shouldNavigateTouch(touchPointsRef.current.size)) {
       touchPointsRef.current.set(event.pointerId, asViewportTouch(event));
       const start = touchStartRef.current;
@@ -193,7 +201,7 @@ export default function WorksheetCanvas({ state, onChange, selectedId, onSelect,
 
   return (
     <div className={`worksheet-stage ${isDrawing ? "is-drawing" : ""}`}>
-      <svg ref={svgRef} viewBox={`0 0 ${WORKSHEET_WIDTH} ${WORKSHEET_HEIGHT}`} className={`worksheet-paper ${state.transparentBackground ? "is-transparent" : ""}`} style={{ touchAction: "none" }} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={stopPointer} onPointerCancel={stopPointer} onLostPointerCapture={stopPointer} onDoubleClick={() => setCanvasViewport({ scale: 1, offsetX: 0, offsetY: 0 })} aria-label="Editable worksheet canvas">
+      <svg ref={svgRef} viewBox={`0 0 ${WORKSHEET_WIDTH} ${WORKSHEET_HEIGHT}`} className={`worksheet-paper ${state.transparentBackground ? "is-transparent" : ""}`} style={{ touchAction: "none" }} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={stopPointer} onPointerCancel={stopPointer} onLostPointerCapture={stopPointer} onDoubleClick={() => setCanvasViewport({ scale: 1, offsetX: 0, offsetY: 0 })} aria-label="Editable worksheet canvas" data-worksheet-svg>
         <defs>
           <pattern id="checker" width="28" height="28" patternUnits="userSpaceOnUse"><rect width="28" height="28" fill="#fff"/><rect width="14" height="14" fill="#f5f4f1"/><rect x="14" y="14" width="14" height="14" fill="#f5f4f1"/></pattern>
           <marker id="paperloom-arrow" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto" markerUnits="strokeWidth"><path d="M 0 0 L 8 4 L 0 8 z" fill="#42634f"/></marker>

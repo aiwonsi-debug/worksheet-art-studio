@@ -95,4 +95,41 @@ describe("FloatingBrushToolbar", () => {
     await user.keyboard("{ArrowRight}");
     expect(onSizeChange).toHaveBeenCalledWith(13);
   });
+
+  it("routes panel-body pointer gestures to the worksheet SVG in JavaScript so drawing continues under the toolbar", async () => {
+    const onSizeChange = vi.fn();
+    const onOpacityChange = vi.fn();
+    render(<FloatingBrushToolbar size={12} opacity={0.5} onSizeChange={onSizeChange} onOpacityChange={onOpacityChange} />);
+    const panel = screen.getByRole("group", { name: "Live brush controls" });
+
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("data-worksheet-svg", "");
+    document.body.appendChild(svg);
+    try {
+      const dispatched: string[] = [];
+      svg.addEventListener("pointerdown", (event) => dispatched.push(`down:${event.clientX},${event.clientY},${event.pointerId}`));
+      svg.addEventListener("pointermove", (event) => dispatched.push(`move:${event.clientX},${event.clientY}`));
+      svg.addEventListener("pointerup", (event) => dispatched.push(`up:${event.pointerId}`));
+
+      // Gesture that starts over the panel heading (panel body, not a control row)
+      const nativeDown = new PointerEvent("pointerdown", { bubbles: true, pointerId: 7, clientX: 110, clientY: 80, isPrimary: true });
+      const heading = panel.querySelector<HTMLElement>(".floating-brush-toolbar__heading")!;
+      heading.dispatchEvent(nativeDown);
+      // Subsequent move/end keep routing for the same pointer id
+      const panelEl = panel.querySelector<HTMLElement>("[style]") ?? panel;
+      const nativeMove = new PointerEvent("pointermove", { bubbles: true, pointerId: 7, clientX: 115, clientY: 85 });
+      panelEl.dispatchEvent(nativeMove);
+      const nativeUp = new PointerEvent("pointerup", { bubbles: true, pointerId: 7 });
+      panelEl.dispatchEvent(nativeUp);
+
+      expect(dispatched).toEqual(["down:110,80,7", "move:115,85", "up:7"]);
+
+      // Sliders keep their own events — a pointerdown on a control row is not redirected
+      const controlRow = panel.querySelector<HTMLElement>("[data-floating-brush-control]")!;
+      controlRow.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, pointerId: 9, clientX: 99, clientY: 99 }));
+      expect(dispatched.length).toBe(3);
+    } finally {
+      svg.remove();
+    }
+  });
 });
