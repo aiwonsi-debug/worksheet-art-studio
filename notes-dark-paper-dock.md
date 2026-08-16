@@ -101,3 +101,18 @@ cacheBust.ts (client): readBuildVersion ignores placeholder "__MANUS_BUILD_VERSI
 Tests: 110 pass (snapshot version.json once per run; appVersionFallback.test.ts mocks readBuildVersion returning "unknown").
 Remaining: (1) verify prod /api/trpc/app-version returns NON-unknown after 84d8b866 rollout (wait ~90s, check). Expect a self-derived hash like sha-xxxx since platform skips define and lacks files. (2) Push to GitHub: cd /home/ubuntu/worksheet-art-studio && git add -A && git commit -m "..." && git push github main (remote name likely "github"; check `git remote -v`). (3) Deliver final message: tell user to refresh Brave on phone, dark artboard + white paper default, dock Light/Dark paper toggle, draw under toolbar works, cache busting automatic.
 GitHub remote check: earlier push used some remote; verify with git remote -v.
+
+## State Aug 16 ~15:35 UTC — checkpoint 864c4a9f (decisive probe)
+DECISIVE FINDINGS:
+- Production index.html NOW contains buildprobe-779121fd comment (Vite build DOES run on platform!) and serves old-named asset index-Dgo74T5i.js.
+- BUT /tmp/probundle1.js (prod bundle, 958KB) DOES contain the NEWEST cache-bust code (app-version URL + paperloom-reloaded-version guard + unknown-tolerant logic = latest cacheBust.ts). Yet local sandbox build of SAME HEAD produces index-HXCxQG3V.js (1.24MB, different content).
+- So: platform serves its own asset naming/content that is OUT OF SYNC with sandbox. The prod bundle content ≈ newer than 32fc73d9 but hash name frozen. Likely the platform CDN serves files hashed differently (different minifier) and index-Dgo74T5i.js has been UPDATED in place on the CDN (hash not content-identity anymore!). This means prod IS up-to-date or close; earlier "unknown"/missing-version diagnosis was about a transitional state.
+- The server-side version resolution works: /api/trpc/app-version returns aced6a2e (from dist/public/index.html marker on server, injected by platform build). The marker regex requires manus-build-version class script content "[hash]" — prod HTML on server has marker injected (aced6a2e).
+- Client-side cacheBust.ts: tolerates placeholder, reloads on server version change, sessionStorage guard paperloom-reloaded-version. The prod JS bundle already contains this code.
+- Next steps to close the loop:
+  1. Remove temporary system.diag probe from server/_core/systemRouter.ts (keep clean code). Keep app-version endpoint + buildVersion chain (it now works: aced6a2e).
+  2. The cache bust should now self-heal: browser loads prod bundle (has tolerant cacheBust) → fetches /api/trpc/app-version (aced6a2e) → compares marker (placeholder on served HTML? — the served HTML is platform build; marker may or may not be injected in served HTML). If build unknown, reloads once per server version.
+  3. Run pnpm test + pnpm check, fix tests, then checkpoint.
+  4. Push to GitHub: git add -A && git commit -m "..." && git push <remote> main (check git remote -v for the private repo remote).
+  5. Deliver final result to user: all features live; ask to refresh Brave.
+- Test flakiness note: version.json rewritten by platform rclone every ~35s in sandbox; server tests snapshot it once; appVersionFallback.test.ts mocks readBuildVersion.
