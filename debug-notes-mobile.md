@@ -1,0 +1,36 @@
+# Debug Notes — Mobile White Margin Report (2026-08-16)
+
+## User report
+Screenshot at 1080x2200 (Brave, Android) shows worksheet as a SMALL white inner rectangle surrounded by a wide white margin inside the artboard. Strokes drawn outside the inner rectangle don't register. Screenshot shows sheet meta "Letter • 8.5 × 11 in • 20 layers" and strokes only inside the inner rect. Browser tab was a 6-tab session, production domain artstudio-wfaanbnb.manus.space.
+
+## Diagnosis so far
+1. Dev-server screenshot at 390x844 shows paper filling the frame edge-to-edge — no white margin in dev. The 1080x2200 screenshot also showed full-edge paper.
+2. BUT the user's screenshot shows a clearly smaller inner rectangle. Possible causes:
+   - Production build may differ from dev (checkpoint 2bb806f published; user saw it live).
+   - The user's worksheet may be heavily zoomed-out?? No — their screenshot shows a tiny rect inside large white stage.
+   - The art-canvas-frame width is `min(100%, 720px)` and worksheet-stage SVG width 100%; paper is `width:100%; height:auto` — SVG with viewBox only has no intrinsic aspect-ratio-driven height unless width set on SVG style. index.css has `.worksheet-paper { width:100%; height:auto; display:block }` — in the NEW artStudio layout the SVG relies on aspect ratio preserved by viewBox; height auto + width 100% should preserve ratio.
+   - Suspect: on the user's device (1080px wide) the media breakpoints behave differently — at 1080px width (<1180 breakpoint) sidebar hidden; workspace grid 66px + 1fr. Canvas frame `min(100%,720px)` = 720px, centered in remaining ~1014px → dark margins each side, NOT white. White margin suggests the stage background (#fff) is visible around a smaller SVG.
+   - KEY: `.worksheet-stage` has `background: #fff` and `overflow:hidden`. If SVG height shrinks (e.g., height:auto on SVG without explicit width attribute, some browsers compute height=0?? then 0 height; or stage is taller), white area above/below. Actually white margin appears around ALL sides (left/right too) per screenshot: there is a clear white band left/right of the inner rect → the stage is wider than SVG. That happens if SVG width fails to be 100%.
+   - In user screenshot: white margin left/right of inner rect, AND toolbar overlaps it; the stage white box is bigger than paper.
+   - Candidate regression: floating-brush-toolbar is position:absolute z-index 5 INSIDE art-canvas-frame — fine. But earlier dev screenshots show full white paper.
+   - Another candidate: user's browser Brave at 1080px width uses desktop layout (sidebar hidden, rail+zone). art-canvas-frame min(100%,720px) = 720px wide, padding 12px, so stage = ~696px wide, paper SVG width 100% → fills. Unless CSS failed to load in prod (HMR-only class)? ArtStudio css loaded via import in client? Check client/src/main.tsx or Home imports artStudio.css.
+3. Also verify: does the published build actually contain latest artStudio.css? Checkpoint published automatically. curl prod returns 200.
+4. User earlier (before toolbar change) confirmed drawing outside worked. This screenshot was taken AFTER toolbar checkpoint (has floating toolbar visible at 14px offset with 2px size, 20 layers).
+
+## Facts
+- WORKSHEET_WIDTH=920, WORKSHEET_HEIGHT=1160 (client/src/lib/studioTypes.ts:86-87)
+- worksheet-paper SVG: viewBox 0 0 920 1160, className includes worksheet-paper, style touch-action none; pointerToSheet converts via getBoundingClientRect of SVG — uses rect.width/height so should still map full area even if SVG shrinks (drawing would work but visually paper looks small).
+- pointerToSheet clamps to [0,WORKSHEET_WIDTH/H]: drawing outside visual paper WOULD still register (map inside) — but user says can't draw outside → matches SVG-shrunk scenario where rect is the small visible SVG, outside it no pointer handler (onPointerDown on SVG only).
+
+## Confirmed finding (dev preview, 390x844 & 1080x2140)
+The paper SVG DOES fill the stage width, but on tall phone viewports the stage (stage width ÷ 920×1160 ratio) is TALLER than the phone-visible zone allows, OR the stage is sized to sheet ratio but the frame column is limited by height... In the phone screenshots the white stage visibly extends ABOVE and BELOW the paper? No — actually the paper fills the stage fully; the stage itself is white-background and appears as a large white rectangle, exactly what the user calls 'can't see drawing area' — the green inner paper-edge outline is faint at low zoom and the white stage blends into the toolbar overlay. In the user's screenshot the inner rectangle IS the paper (green outline visible inside), meaning the PAPER IS SMALLER than the stage. In dev screenshots the paper fills the stage edge-to-edge (stage border = paper edge). Difference: user's production page — but prod CSS contains both sheets.
+NOTE user's screenshot: white margin LEFT and RIGHT of paper, and paper outline inside → stage wider than paper. At 1080px viewport, .art-canvas-frame = min(100%,720px)=720px; worksheet-stage width 100% of frame minus nothing → SVG width 100%. Unless the frame has no width... In dev at 1080x2140, frame is ~900px wide? Actually screenshot shows stage fills most width, paper fills stage. Hmm — dev at 1080 wide showed paper filling stage too.
+DIFF: user screenshot paper ≈ 62% of frame width with thick white margins all around, AND user's phone is 1080 logical px? No, physical 1080, devicePixelRatio ~2.75 → CSS width ≈ 393px → matches 390px dev layout. Dev 390 layout looks IDENTICAL to user's screenshot (toolbar top-left, history top-right, bottom dock). So regression is present but dev screenshot I compared earlier — the paper DID fill the stage. User's screenshot has a second white rectangle inside? Look again: there is a faint light-gray outline inside white area = paper outline offset. Paper slightly inset from stage edge. In dev the paper touches the green stage border exactly.
+=> Likely cause: on the USER's actual session the sheet has been ZOOMED OUT (pinch) — white stage visible = stage background; paper scaled smaller with viewport transform; pointer handler only on SVG which shrunk → can't draw outside. But zoom state shouldn't persist per session? It could if saved... OR the earlier fix (full-sheet drawing) was never on the build the user tested? Checkpoint 0bc452d included it and was published; toolbar update published later too.
+=> Actually in user's screenshot paper appears ~80% width of stage. Zoomed-out viewport: pointerToSheet still maps full stage because it uses SVG rect; if SVG shrinks, 'outside' drawing impossible. So the real bug for user = paper is smaller than stage due to a zoom-out viewport that the toolbar overlay or meta suggests is identity (no hint).
+=> Also: pinch zooms out to 0.55 possible. A double-click resets, but user may not know.
+=> FIX options: (a) prevent zoom-out below 1 so the sheet always fills the frame (simplest, matches requirement 'can't see drawing area'), or (b) fit-to-sheet behavior. User wants: sheet fills drawing area always. Set min scale = 1, or snap identity. Also confirm no zoom persistence.
+
+## Next checks
+- Whether artStudio.css is imported in the new studio route (client/src/App.tsx or Home.tsx import '../styles/artStudio.css'?)
+- Whether published bundle at prod contains the CSS (fetch prod HTML/asset list).

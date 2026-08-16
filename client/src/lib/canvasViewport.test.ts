@@ -16,4 +16,10 @@ describe("nextViewportFromTouchGesture", () => {
     expect(zoomed.scale).toBe(2);
     expect(nextViewportFromTouchGesture({ scale: 2.4, offsetX: 0, offsetY: 0 }, [{ id: 1, x: 0, y: 0 }, { id: 2, x: 10, y: 0 }], [{ id: 1, x: 0, y: 0 }, { id: 2, x: 80, y: 0 }]).scale).toBe(2.5);
   });
+
+  it("never zooms below identity scale so the sheet always fills the visible frame", () => {
+    const zoomedOut = nextViewportFromTouchGesture({ scale: 1, offsetX: 0, offsetY: 0 }, [{ id: 1, x: 0, y: 50 }, { id: 2, x: 100, y: 50 }], [{ id: 1, x: 40, y: 50 }, { id: 2, x: 60, y: 50 }]);
+    expect(zoomedOut.scale).toBe(1);
+    expect(nextViewportFromTouchGesture({ scale: 1.6, offsetX: 10, offsetY: 8 }, [{ id: 1, x: 0, y: 50 }, { id: 2, x: 100, y: 50 }], [{ id: 1, x: 40, y: 50 }, { id: 2, x: 60, y: 50 }]).scale).toBe(1);
+  });
 });

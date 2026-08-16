@@ -115,3 +115,6 @@
 - [x] Save a post-verification checkpoint for the floating brush toolbar update.
 - [x] Push the published floating toolbar source update to the private GitHub repository.
 - [x] Verify that the private GitHub main branch contains the floating-toolbar checkpoint and current checklist update.
+- [x] Fix mobile regression: worksheet shows a white margin with a small inner drawing rectangle instead of filling the visible area edge-to-edge; drawing does not register outside the inner rectangle.
+- [x] Add/extend regression coverage asserting the full-sheet pointer mapping holds across the mobile layout.
+- [x] Verify full-sheet drawing at a phone viewport and publish the fix.

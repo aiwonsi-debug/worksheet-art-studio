@@ -20,6 +20,6 @@ export function nextViewportFromTouchGesture(startViewport: CanvasViewport, star
   const from = center(startPoints);
   const to = center(currentPoints);
   const hasPinch = startPoints.length > 1 && currentPoints.length > 1;
-  const scale = hasPinch ? Math.max(0.55, Math.min(2.5, startViewport.scale * (distance(currentPoints) / distance(startPoints)))) : startViewport.scale;
+  const scale = hasPinch ? Math.max(1, Math.min(2.5, startViewport.scale * (distance(currentPoints) / distance(startPoints)))) : startViewport.scale;
   return { scale, offsetX: startViewport.offsetX + to.x - from.x, offsetY: startViewport.offsetY + to.y - from.y };
 }
