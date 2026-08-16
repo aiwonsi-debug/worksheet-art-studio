@@ -13,6 +13,7 @@
 
 import express, { type Express, type Router, type Request, type Response } from "express";
 import fs from "node:fs";
+import { publicProcedure } from "./_core/trpc";
 import { readBuildVersion } from "./_core/buildVersion";
 
 // The deployed version is resolved at runtime by
@@ -34,25 +35,21 @@ export function registerAppVersionRoute(app: Express | Router) {
   });
 }
 
-// Temporary diagnostic endpoint to inspect the production runtime layout.
-export function registerDiagRoute(app: Express | Router) {
-  (app as Router).get("/diag", (_req: Request, res: Response) => {
-    const entry = process.argv[1];
-    res.type("json").send({
-      nodeEnv: process.env.NODE_ENV,
-      cwd: process.cwd(),
-      argv: process.argv.slice(0, 3),
-      entry: entry,
-      entryExists: entry ? fs.existsSync(entry) : null,
-      distExists: fs.existsSync("dist"),
-      distPublicExists: fs.existsSync("dist/public"),
-      distPublicIndexExists: fs.existsSync("dist/public/index.html"),
-      versionJsonExists: fs.existsSync(
-        "client/public/__manus__/version.json"
-      ),
-      envKeys: Object.keys(process.env).filter((k) =>
-        /MANUS|DEPLOY|VERSION|BUILD/i.test(k)
-      ),
-    });
-  });
-}
+// Temporary diagnostic procedure to inspect the production runtime layout.
+export const diagProcedure = publicProcedure.query(() => {
+  const entry = process.argv[1];
+  return {
+    nodeEnv: process.env.NODE_ENV,
+    cwd: process.cwd(),
+    argv: process.argv.slice(0, 3),
+    entry: entry,
+    entryExists: entry ? fs.existsSync(entry) : null,
+    distExists: fs.existsSync("dist"),
+    distPublicExists: fs.existsSync("dist/public"),
+    distPublicIndexExists: fs.existsSync("dist/public/index.html"),
+    versionJsonExists: fs.existsSync("client/public/__manus__/version.json"),
+    envKeys: Object.keys(process.env).filter((k) =>
+      /MANUS|DEPLOY|VERSION|BUILD/i.test(k)
+    ),
+  };
+});
