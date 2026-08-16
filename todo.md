@@ -106,3 +106,6 @@
 - [x] Verify the desktop worksheet-boundary treatment and its regression safety.
 - [x] Verify worksheet-boundary visibility at a tablet viewport.
 - [x] Save the verified worksheet-boundary update as a delivery checkpoint.
+- [x] Expand the active drawing surface to match the full visible worksheet and remove the non-drawable white margin.
+- [x] Add regression coverage for full-sheet pointer coordinate mapping and validate the behavior on a mobile viewport.
+- [ ] Save the verified full-sheet drawing correction as a delivery checkpoint.
